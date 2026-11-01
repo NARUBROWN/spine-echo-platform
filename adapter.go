@@ -5,14 +5,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
 	adapter "github.com/NARUBROWN/spine/adapter"
-	"github.com/labstack/echo/v4"
-	"github.com/labstack/gommon/log"
+	"github.com/labstack/echo/v5"
 )
 
 const (
@@ -112,10 +113,9 @@ func normalizeHTTPOptions(opts adapter.ServerOptions) normalizedHTTPOptions {
 }
 
 func newEcho(opts normalizedHTTPOptions) *echo.Echo {
-	e := echo.New()
-	e.HideBanner = true
-	e.HidePort = true
-	e.Logger.SetLevel(log.ERROR)
+	e := echo.NewWithConfig(echo.Config{
+		Logger: slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError})),
+	})
 	if !opts.DisableRecover {
 		e.Use(simpleRecover())
 	}
@@ -125,10 +125,10 @@ func newEcho(opts normalizedHTTPOptions) *echo.Echo {
 // simpleRecover는 외부 의존 없이 패닉을 500 응답으로 변환하는 최소한의 미들웨어입니다.
 func simpleRecover() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
+		return func(c *echo.Context) error {
 			defer func() {
 				if r := recover(); r != nil {
-					c.Logger().Errorf("panic recovered: %v", r)
+					c.Logger().ErrorContext(c.Request().Context(), "panic recovered", "panic", r)
 					_ = c.JSON(http.StatusInternalServerError, map[string]any{
 						"message": "Internal server error",
 					})
@@ -176,7 +176,7 @@ func (s *EchoAdapter) Serve(listener net.Listener) error {
 	return s.httpServer.Serve(listener)
 }
 
-func (s *EchoAdapter) handle(c echo.Context) error {
+func (s *EchoAdapter) handle(c *echo.Context) error {
 	if s.maxBodyBytes > 0 {
 		req := c.Request()
 		req.Body = http.MaxBytesReader(c.Response(), req.Body, s.maxBodyBytes)
@@ -186,7 +186,7 @@ func (s *EchoAdapter) handle(c echo.Context) error {
 	ctx := newContext(c)
 
 	if err := s.execute(ctx); err != nil {
-		c.Logger().Errorf("HTTP execution error: %v", err)
+		c.Logger().ErrorContext(c.Request().Context(), "HTTP execution error", "error", err)
 		// 파이프라인 내부에서 이미 응답이 작성되었으므로 Echo 기본 에러 핸들러로 중복 전달하지 않는다.
 		return nil
 	}

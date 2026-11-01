@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -11,7 +12,7 @@ import (
 	"time"
 
 	adapter "github.com/NARUBROWN/spine/adapter"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 func TestFactoryRejectsInvalidConfigBeforeHooks(t *testing.T) {
@@ -71,8 +72,8 @@ func TestFactoryCreatesIndependentHandlersWithoutRemounting(t *testing.T) {
 	if len(natives) != 2 || natives[0] == natives[1] {
 		t.Fatalf("훅은 준비마다 한 번만 호출해야 합니다: %d", len(natives))
 	}
-	if first.echo.Server == first.httpServer {
-		t.Fatal("native Echo Server와 실제 실행 서버의 기존 분리를 유지해야 합니다")
+	if first.httpServer == second.httpServer || first.httpServer.Handler != first.echo || second.httpServer.Handler != second.echo {
+		t.Fatal("각 어댑터는 해당 Echo handler를 사용하는 독립 HTTP 서버를 소유해야 합니다")
 	}
 }
 
@@ -84,7 +85,7 @@ func TestFactoryMountOrderAndHookSnapshot(t *testing.T) {
 			order = append(order, "first")
 			hooks[1] = func(any) { order = append(order, "mutated") }
 			value.(*echo.Echo).Use(func(next echo.HandlerFunc) echo.HandlerFunc {
-				return func(ctx echo.Context) error {
+				return func(ctx *echo.Context) error {
 					ctx.Response().Header().Set("X-Native", "yes")
 					return next(ctx)
 				}
@@ -92,7 +93,7 @@ func TestFactoryMountOrderAndHookSnapshot(t *testing.T) {
 		},
 		func(value any) {
 			order = append(order, "second")
-			value.(*echo.Echo).GET("/ws/a", func(ctx echo.Context) error { return ctx.String(200, "native") })
+			value.(*echo.Echo).GET("/ws/a", func(ctx *echo.Context) error { return ctx.String(200, "native") })
 		},
 	}
 	var calls int
@@ -162,10 +163,10 @@ func TestFactoryRequestScopeAndNoErrorRedelivery(t *testing.T) {
 		},
 		NativeHooks: []func(any){func(value any) {
 			e := value.(*echo.Echo)
-			e.Logger.SetOutput(io.Discard)
-			e.HTTPErrorHandler = func(error, echo.Context) { errorCalls++ }
+			e.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
+			e.HTTPErrorHandler = func(*echo.Context, error) { errorCalls++ }
 			e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
-				return func(ctx echo.Context) error { ctx.Set("native-value", true); return next(ctx) }
+				return func(ctx *echo.Context) error { ctx.Set("native-value", true); return next(ctx) }
 			})
 		}},
 	})
@@ -181,6 +182,33 @@ func TestFactoryRequestScopeAndNoErrorRedelivery(t *testing.T) {
 	}
 	if len(contexts) != 2 || contexts[0] == contexts[1] || errorCalls != 0 {
 		t.Fatalf("요청마다 한 번 실행하고 Echo 오류 처리기로 재전달하지 않아야 합니다: contexts=%d errors=%d", len(contexts), errorCalls)
+	}
+}
+
+func TestFactoryUpgradeReceivesRawWriterThroughEchoV5Wrapper(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	var received http.ResponseWriter
+	server := newConfiguredAdapter(t, adapter.Config{
+		Execute: func(adapter.HTTPContext) error {
+			t.Fatal("업그레이드 경로가 Spine HTTP 실행 콜백을 호출하면 안 됩니다")
+			return nil
+		},
+		Upgrades: []adapter.UpgradeRoute{{Path: "/ws", Handler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			received = w
+			_, _ = io.WriteString(w, "raw-upgrade")
+		})}},
+		NativeHooks: []func(any){func(value any) {
+			value.(*echo.Echo).Use(func(next echo.HandlerFunc) echo.HandlerFunc {
+				return func(ctx *echo.Context) error {
+					ctx.SetResponse(unwrapTestWriter{ctx.Response()})
+					return next(ctx)
+				}
+			})
+		}},
+	})
+	server.Handler().ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/ws", nil))
+	if received != recorder || recorder.Body.String() != "raw-upgrade" {
+		t.Fatalf("업그레이드는 원래 writer를 받아야 합니다: %T %q", received, recorder.Body.String())
 	}
 }
 

@@ -7,18 +7,18 @@ import (
 	"net/http"
 
 	adapter "github.com/NARUBROWN/spine/adapter"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 type echoContext struct {
-	echo   echo.Context
+	echo   *echo.Context
 	reqCtx context.Context
 	writer adapter.ResponseWriter
 }
 
 var _ adapter.HTTPContext = (*echoContext)(nil)
 
-func newContext(c echo.Context) adapter.HTTPContext {
+func newContext(c *echo.Context) adapter.HTTPContext {
 	return &echoContext{echo: c, reqCtx: c.Request().Context(), writer: newEchoResponseWriter(c)}
 }
 
@@ -33,12 +33,10 @@ func (c *echoContext) Headers() map[string][]string   { return c.echo.Request().
 func (c *echoContext) Writer() adapter.ResponseWriter { return c.writer }
 
 func (c *echoContext) Params() map[string]string {
-	names, values := c.echo.ParamNames(), c.echo.ParamValues()
-	params := make(map[string]string, len(names))
-	for i, name := range names {
-		if i < len(values) {
-			params[name] = values[i]
-		}
+	values := c.echo.PathValues()
+	params := make(map[string]string, len(values))
+	for _, value := range values {
+		params[value.Name] = value.Value
 	}
 	return params
 }
@@ -58,16 +56,15 @@ func normalizeRequestError(err error) error {
 	if errors.As(err, &maxBytes) {
 		return maxBytes
 	}
-	var echoError *echo.HTTPError
-	if errors.As(err, &echoError) {
-		if echoError.Code < 400 || echoError.Code >= 500 {
+	if status := echo.StatusCode(err); status != 0 {
+		if status < 400 || status >= 500 {
 			return err
 		}
-		message := http.StatusText(echoError.Code)
+		message := http.StatusText(status)
 		if message == "" {
 			message = "Invalid request"
 		}
-		return &adapter.RequestError{Status: echoError.Code, Message: message, Cause: err}
+		return &adapter.RequestError{Status: status, Message: message, Cause: err}
 	}
 	return &adapter.RequestError{Status: http.StatusBadRequest, Message: http.StatusText(http.StatusBadRequest), Cause: err}
 }

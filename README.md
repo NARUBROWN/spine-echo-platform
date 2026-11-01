@@ -1,6 +1,6 @@
 # spine-echo-platform
 
-Echo 기반 HTTP 플랫폼과 Spine 편의 생성자를 제공합니다. Go 패키지 이름은 `platform`입니다.
+Echo v5.4.4 기반 HTTP 플랫폼과 Spine 편의 생성자를 제공합니다. Go 패키지 이름은 `platform`이며 Go 1.25.5 이상을 사용합니다.
 
 플랫폼 모듈은 Spine과 Echo를 의존성으로 가져오고, Spine의 공개 `adapter` 계약을 구현하는 EchoAdapter를 제공합니다. 계약은 Spine 모듈에 포함되며 별도 계약 모듈이나 저장소를 요구하지 않습니다.
 
@@ -24,7 +24,29 @@ func main() {
 
 NewFactory는 `github.com/NARUBROWN/spine/adapter.Factory`를 제공합니다. 구성 시 fallback, WS GET 경로, native 훅 순으로 마운트합니다. DTO 바인딩과 multipart 파싱, 실제 응답 출력과 HTTP 서버 종료를 처리합니다. Spine의 응답 staging과 WS 메시지 엔진은 커널에 남습니다.
 
-app.Transport는 기존 *echo.Echo를 전달합니다. native 경로는 Spine의 HTTP 인터셉터, 본문 제한과 staging을 거치지 않습니다. native store와 Spine 요청 store는 별개이므로 공유 요청 값은 표준 context를 사용합니다.
+app.Transport는 `github.com/labstack/echo/v5`의 `*echo.Echo`를 전달합니다. native 경로는 Spine의 HTTP 인터셉터, 본문 제한과 staging을 거치지 않습니다. native store와 Spine 요청 store는 별개이므로 공유 요청 값은 표준 context를 사용합니다.
+
+## Native Echo v5 확장
+
+Spine의 공개 adapter 계약과 컨트롤러 등록 API는 유지합니다. native Echo 확장 코드는 v5 import와 포인터 Context를 사용합니다.
+
+```go
+import "github.com/labstack/echo/v5"
+
+app.Transport(func(native any) {
+    e := native.(*echo.Echo)
+    e.GET("/native", func(ctx *echo.Context) error {
+        return ctx.String(200, "native")
+    })
+})
+```
+
+- handler와 middleware는 `*echo.Context`를 받습니다.
+- `HTTPErrorHandler`는 `func(ctx *echo.Context, err error)` 순서입니다.
+- logger는 표준 `log/slog`를 사용합니다.
+- 경로 인자는 `PathValues()`로 조회합니다. `Response()`는 `http.ResponseWriter`를 반환하며 Echo의 상태가 필요하면 `echo.UnwrapResponse`를 사용합니다. native middleware의 응답 wrapper도 `Unwrap() http.ResponseWriter`를 제공해야 합니다.
+
+플랫폼은 v5의 HTTP 상태 코드 인터페이스를 통해 입력 오류의 상태와 원인을 보존합니다. WS 업그레이드에는 원래 HTTP writer를 전달합니다. 서버 실행과 종료는 플랫폼이 소유한 `http.Server`가 처리합니다.
 
 ## 리스너 없이 앱 준비
 
@@ -32,7 +54,7 @@ app.Transport는 기존 *echo.Echo를 전달합니다. native 경로는 Spine의
 
 준비 결과는 호출자가 `Close(ctx)`로 정리합니다. Close를 시작하면 새 요청은 503을 받고, 진행 중인 요청이 끝난 뒤 프레임워크 자원을 정리합니다. 대기 시간이 초과돼도 정리는 계속되므로 다시 Close를 호출해 완료를 기다릴 수 있습니다. 외부 서버의 listener는 호출자가 종료합니다.
 
-API와 자원 소유권은 [Spine 전환 안내](https://github.com/NARUBROWN/spine/blob/490135eda06ff82acbb0c4f28eab9b7f1bf518a6/docs/migration/http-adapter-modules.md#리스너-없이-앱-준비하기)를 참고하세요.
+API와 자원 소유권은 [개발 브랜치의 Spine 전환 안내](https://github.com/NARUBROWN/spine/blob/feat/9-echo-adapter-contract/docs/migration/http-adapter-modules.md#리스너-없이-앱-준비하기)를 참고하세요.
 
 ## 개발 저장소 구성
 

@@ -2,16 +2,16 @@ package platform
 
 import (
 	adapter "github.com/NARUBROWN/spine/adapter"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 type echoResponseWriter struct {
-	ctx echo.Context
+	ctx *echo.Context
 }
 
 var _ adapter.ResponseWriter = (*echoResponseWriter)(nil)
 
-func newEchoResponseWriter(ctx echo.Context) *echoResponseWriter {
+func newEchoResponseWriter(ctx *echo.Context) *echoResponseWriter {
 	return &echoResponseWriter{ctx: ctx}
 }
 
@@ -32,7 +32,8 @@ func (w *echoResponseWriter) AddHeader(key, value string) {
 }
 
 func (w *echoResponseWriter) IsCommitted() bool {
-	return w.ctx.Response().Committed
+	response, err := echo.UnwrapResponse(w.ctx.Response())
+	return err == nil && response != nil && response.Committed
 }
 
 func (w *echoResponseWriter) WriteStatus(status int) error {

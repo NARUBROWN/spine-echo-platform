@@ -10,7 +10,7 @@ import (
 	"github.com/NARUBROWN/spine"
 	platform "github.com/NARUBROWN/spine-echo-platform"
 	"github.com/NARUBROWN/spine/pkg/boot"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 func TestStarterSelectsEchoWithoutOpeningListener(t *testing.T) {
@@ -28,7 +28,7 @@ func TestStarterPreparesHTTPWithNativeEcho(t *testing.T) {
 		if !ok {
 			t.Fatalf("native 훅은 Echo를 전달해야 합니다: %T", native)
 		}
-		e.GET("/native", func(ctx echo.Context) error {
+		e.GET("/native", func(ctx *echo.Context) error {
 			return ctx.NoContent(http.StatusNoContent)
 		})
 	})

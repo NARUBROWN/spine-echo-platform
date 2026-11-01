@@ -6,7 +6,7 @@ import (
 	"slices"
 
 	adapter "github.com/NARUBROWN/spine/adapter"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 type factory struct{}
@@ -48,8 +48,12 @@ func (factory) New(config adapter.Config) (adapter.HTTPAdapter, error) {
 	server := newAdapter(config.Execute, config.Options)
 	server.echo.Any("/*", server.handle)
 	for _, route := range upgrades {
-		server.echo.GET(route.Path, func(c echo.Context) error {
-			route.Handler.ServeHTTP(c.Response().Writer, c.Request())
+		server.echo.GET(route.Path, func(c *echo.Context) error {
+			response, err := echo.UnwrapResponse(c.Response())
+			if err != nil {
+				return err
+			}
+			route.Handler.ServeHTTP(response.ResponseWriter, c.Request())
 			return nil
 		})
 	}
