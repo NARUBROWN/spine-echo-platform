@@ -3,7 +3,7 @@ module github.com/NARUBROWN/spine-echo-platform
 go 1.25.5
 
 require (
-	github.com/NARUBROWN/spine v0.5.3-0.20261101153206-39d90e4c871e
+	github.com/NARUBROWN/spine v0.5.3-0.20261101161224-490135eda06f
 	github.com/labstack/echo/v4 v4.15.0
 	github.com/labstack/gommon v0.4.2
 )

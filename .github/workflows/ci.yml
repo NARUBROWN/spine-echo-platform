@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GOWORK: "off"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - name: Check formatting
+        run: test -z "$(gofmt -l .)"
+      - name: Verify public dependencies
+        run: |
+          go mod tidy
+          go mod verify
+          git diff --exit-code -- go.mod go.sum
+          test -z "$(go list -m -f '{{if .Replace}}{{.Path}}{{end}}' all)"
+      - name: Run vet and race tests
+        run: |
+          go vet ./...
+          go test -race ./... -count=1 -shuffle=on -timeout=5m
