@@ -9,16 +9,16 @@ Spine v0.6.0용 Echo v5.4.4 HTTP 플랫폼과 편의 생성자를 제공합니�
 Spine `v0.6.0`부터 새 프로젝트의 공식 생성 경로는 Spine CLI의 `new`입니다. [최신 공개 CLI](https://github.com/NARUBROWN/spine-cli#권장-환경과-설치)를 설치하면, `new`가 CLI에 포함된 검증 레시피를 따라 Spine, Echo 플랫폼과 Echo의 호환 버전 조합을 구성합니다.
 
 ```sh
-go install github.com/NARUBROWN/spine-cli@latest
-spine-cli version
-spine-cli new todo-api --module github.com/acme/todo-api
+go install github.com/NARUBROWN/spine-cli/cmd/spine@latest
+spine version
+spine new todo-api --module github.com/acme/todo-api
 cd todo-api
-spine-cli dev
+spine dev
 ```
 
 다른 터미널에서 `curl http://localhost:8080/health`로 `200 OK`와 `{"status":"ok"}` 응답을 확인합니다. 선택된 의존성 버전은 생성된 `go.mod`에서 확인합니다.
 
-`new`는 기본으로 플랫폼 연결, 의존성 설치, 정적 계약 검사와 빌드를 완료한 뒤 프로젝트를 생성합니다. 서버는 `spine-cli dev`로 시작합니다. `--skip-install`로 파일만 생성했다면 `go mod tidy`를 별도로 실행하세요.
+`new`는 기본으로 플랫폼 연결, 의존성 설치, 정적 계약 검사와 빌드를 완료한 뒤 프로젝트를 생성합니다. 서버는 `spine dev`로 시작합니다. `--skip-install`로 파일만 생성했다면 `go mod tidy`를 별도로 실행하세요.
 
 ## 기존 앱에 직접 플랫폼 연결
 
