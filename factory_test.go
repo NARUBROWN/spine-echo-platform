@@ -22,7 +22,6 @@ func TestFactoryRejectsInvalidConfigBeforeHooks(t *testing.T) {
 		configurationError bool
 	}{
 		{name: "nil_execute", change: func(c *adapter.Config) { c.Execute = nil }},
-		{name: "nil_hook", change: func(c *adapter.Config) { c.NativeHooks = append(c.NativeHooks, nil) }},
 		{name: "empty_upgrade_path", change: func(c *adapter.Config) {
 			c.Upgrades = []adapter.UpgradeRoute{{Handler: http.NotFoundHandler()}}
 		}},
@@ -37,12 +36,12 @@ func TestFactoryRejectsInvalidConfigBeforeHooks(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			calls := 0
+			sdkOptions := optionsForHooks([]func(*echo.Echo){func(*echo.Echo) { calls++ }})
 			config := adapter.Config{
-				Execute:     func(adapter.HTTPContext) error { return nil },
-				NativeHooks: []func(any){func(any) { calls++ }},
+				Execute: func(adapter.HTTPContext) error { return nil },
 			}
 			tt.change(&config)
-			server, err := NewFactory().New(config)
+			server, err := NewFactory(sdkOptions...).New(config)
 			if server != nil || err == nil || calls != 0 {
 				t.Fatalf("잘못된 입력은 훅 실행 전에 실패해야 합니다: server=%v err=%v calls=%d", server, err, calls)
 			}
@@ -54,18 +53,18 @@ func TestFactoryRejectsInvalidConfigBeforeHooks(t *testing.T) {
 }
 
 func TestFactoryCreatesIndependentHandlersWithoutRemounting(t *testing.T) {
-	if err := adapter.ValidateFactory(NewFactory(), adapter.Requirements{WebSocketUpgrade: true, NativeHooks: true}); err != nil {
+	if err := adapter.ValidateFactory(NewFactory(), adapter.Requirements{WebSocketUpgrade: true}); err != nil {
 		t.Fatal(err)
 	}
 	var natives []*echo.Echo
+	sdkOptions := optionsForHooks([]func(*echo.Echo){func(value *echo.Echo) {
+		natives = append(natives, value)
+	}})
 	config := adapter.Config{
 		Execute: func(adapter.HTTPContext) error { return nil },
-		NativeHooks: []func(any){func(value any) {
-			natives = append(natives, value.(*echo.Echo))
-		}},
 	}
-	first := newConfiguredAdapter(t, config)
-	second := newConfiguredAdapter(t, config)
+	first := newConfiguredAdapter(t, config, sdkOptions...)
+	second := newConfiguredAdapter(t, config, sdkOptions...)
 	if first == second || first.Handler() == second.Handler() || first.Handler() != first.Handler() {
 		t.Fatal("준비마다 독립 인스턴스를 만들고 Handler는 동일 진입점을 반환해야 합니다")
 	}
@@ -79,21 +78,21 @@ func TestFactoryCreatesIndependentHandlersWithoutRemounting(t *testing.T) {
 
 func TestFactoryMountOrderAndHookSnapshot(t *testing.T) {
 	var order []string
-	var hooks []func(any)
-	hooks = []func(any){
-		func(value any) {
+	var hooks []func(*echo.Echo)
+	hooks = []func(*echo.Echo){
+		func(value *echo.Echo) {
 			order = append(order, "first")
-			hooks[1] = func(any) { order = append(order, "mutated") }
-			value.(*echo.Echo).Use(func(next echo.HandlerFunc) echo.HandlerFunc {
+			hooks[1] = func(*echo.Echo) { order = append(order, "mutated") }
+			value.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
 				return func(ctx *echo.Context) error {
 					ctx.Response().Header().Set("X-Native", "yes")
 					return next(ctx)
 				}
 			})
 		},
-		func(value any) {
+		func(value *echo.Echo) {
 			order = append(order, "second")
-			value.(*echo.Echo).GET("/ws/a", func(ctx *echo.Context) error { return ctx.String(200, "native") })
+			value.GET("/ws/a", func(ctx *echo.Context) error { return ctx.String(200, "native") })
 		},
 	}
 	var calls int
@@ -109,6 +108,7 @@ func TestFactoryMountOrderAndHookSnapshot(t *testing.T) {
 			_, _ = io.WriteString(w, "upgrade-b:"+string(body))
 		})},
 	}
+	sdkOptions := optionsForHooks(hooks)
 	server := newConfiguredAdapter(t, adapter.Config{
 		Options: adapter.ServerOptions{MaxBodyBytes: 1},
 		Execute: func(ctx adapter.HTTPContext) error {
@@ -116,8 +116,8 @@ func TestFactoryMountOrderAndHookSnapshot(t *testing.T) {
 			writer := ctx.Writer()
 			return writer.WriteString(200, "fallback")
 		},
-		Upgrades: upgrades, NativeHooks: hooks,
-	})
+		Upgrades: upgrades,
+	}, sdkOptions...)
 	upgrades[1].Handler = http.NotFoundHandler()
 	if strings.Join(order, ",") != "first,second" {
 		t.Fatalf("훅 목록을 snapshot으로 고정해야 합니다: %v", order)
@@ -146,6 +146,14 @@ func TestFactoryRequestScopeAndNoErrorRedelivery(t *testing.T) {
 	wantErr := errors.New("execution failed after response")
 	var contexts []adapter.HTTPContext
 	var errorCalls int
+	sdkOptions := optionsForHooks([]func(*echo.Echo){func(value *echo.Echo) {
+		e := value
+		e.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
+		e.HTTPErrorHandler = func(*echo.Context, error) { errorCalls++ }
+		e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
+			return func(ctx *echo.Context) error { ctx.Set("native-value", true); return next(ctx) }
+		})
+	}})
 	server := newConfiguredAdapter(t, adapter.Config{
 		Execute: func(ctx adapter.HTTPContext) error {
 			if ctx.Context().Value(contextKey{}) != "carried" {
@@ -161,15 +169,7 @@ func TestFactoryRequestScopeAndNoErrorRedelivery(t *testing.T) {
 			}
 			return wantErr
 		},
-		NativeHooks: []func(any){func(value any) {
-			e := value.(*echo.Echo)
-			e.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
-			e.HTTPErrorHandler = func(*echo.Context, error) { errorCalls++ }
-			e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
-				return func(ctx *echo.Context) error { ctx.Set("native-value", true); return next(ctx) }
-			})
-		}},
-	})
+	}, sdkOptions...)
 	for range 2 {
 		request := httptest.NewRequest("POST", "/items?page=2", nil)
 		request.Header.Set("X-Request", "value")
@@ -188,6 +188,14 @@ func TestFactoryRequestScopeAndNoErrorRedelivery(t *testing.T) {
 func TestFactoryUpgradeReceivesRawWriterThroughEchoV5Wrapper(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	var received http.ResponseWriter
+	sdkOptions := optionsForHooks([]func(*echo.Echo){func(value *echo.Echo) {
+		value.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
+			return func(ctx *echo.Context) error {
+				ctx.SetResponse(unwrapTestWriter{ctx.Response()})
+				return next(ctx)
+			}
+		})
+	}})
 	server := newConfiguredAdapter(t, adapter.Config{
 		Execute: func(adapter.HTTPContext) error {
 			t.Fatal("업그레이드 경로가 Spine HTTP 실행 콜백을 호출하면 안 됩니다")
@@ -197,26 +205,53 @@ func TestFactoryUpgradeReceivesRawWriterThroughEchoV5Wrapper(t *testing.T) {
 			received = w
 			_, _ = io.WriteString(w, "raw-upgrade")
 		})}},
-		NativeHooks: []func(any){func(value any) {
-			value.(*echo.Echo).Use(func(next echo.HandlerFunc) echo.HandlerFunc {
-				return func(ctx *echo.Context) error {
-					ctx.SetResponse(unwrapTestWriter{ctx.Response()})
-					return next(ctx)
-				}
-			})
-		}},
-	})
+	}, sdkOptions...)
 	server.Handler().ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/ws", nil))
 	if received != recorder || recorder.Body.String() != "raw-upgrade" {
 		t.Fatalf("업그레이드는 원래 writer를 받아야 합니다: %T %q", received, recorder.Body.String())
 	}
 }
 
-func newConfiguredAdapter(t *testing.T, config adapter.Config) *EchoAdapter {
+func newConfiguredAdapter(t *testing.T, config adapter.Config, options ...EchoOption) *EchoAdapter {
 	t.Helper()
-	server, err := NewFactory().New(config)
+	server, err := NewFactory(options...).New(config)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return server.(*EchoAdapter)
+}
+
+func optionsForHooks(hooks []func(*echo.Echo)) []EchoOption {
+	options := make([]EchoOption, 0, len(hooks))
+	for _, hook := range hooks {
+		options = append(options, WithEcho(hook))
+	}
+	return options
+}
+
+func TestTypedEchoOptionsAreLazyAndReusable(t *testing.T) {
+	var natives []*echo.Echo
+	options := []EchoOption{WithEcho(func(e *echo.Echo) { natives = append(natives, e) })}
+	factory := NewFactory(options...)
+	options[0] = WithEcho(func(*echo.Echo) { t.Fatal("변경된 옵션이 기존 factory에 반영되면 안 됩니다") })
+	if err := adapter.ValidateFactory(factory, adapter.Requirements{}); err != nil || len(natives) != 0 {
+		t.Fatalf("생성과 기능 검사는 Echo 설정을 실행하면 안 됩니다: %v", err)
+	}
+	for range 2 {
+		if _, err := factory.New(adapter.Config{Execute: func(adapter.HTTPContext) error { return nil }}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if len(natives) != 2 || natives[0] == natives[1] {
+		t.Fatal("준비마다 독립 Echo 인스턴스에 같은 설정을 한 번 적용해야 합니다")
+	}
+}
+
+func TestFactoryRejectsNilEchoConfigurationBeforeHooks(t *testing.T) {
+	calls := 0
+	factory := NewFactory(WithEcho(func(*echo.Echo) { calls++ }), WithEcho(nil))
+	server, err := factory.New(adapter.Config{Execute: func(adapter.HTTPContext) error { return nil }})
+	if server != nil || !errors.Is(err, adapter.ErrInvalidAdapter) || calls != 0 {
+		t.Fatalf("nil Echo 설정은 실행 전에 거부해야 합니다: server=%v err=%v calls=%d", server, err, calls)
+	}
 }

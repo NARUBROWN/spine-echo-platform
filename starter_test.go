@@ -22,17 +22,11 @@ func TestStarterSelectsEchoWithoutOpeningListener(t *testing.T) {
 }
 
 func TestStarterPreparesHTTPWithNativeEcho(t *testing.T) {
-	app := platform.New()
-	app.Transport(func(native any) {
-		e, ok := native.(*echo.Echo)
-		if !ok {
-			t.Fatalf("native 훅은 Echo를 전달해야 합니다: %T", native)
-		}
-		e.GET("/native", func(ctx *echo.Context) error {
-			return ctx.NoContent(http.StatusNoContent)
-		})
-	})
-	prepared, err := spine.Prepare(context.Background(), app, boot.Options{
+	app := platform.New(platform.WithEcho(func(e *echo.Echo) {
+		e.GET("/native", func(ctx *echo.Context) error { return ctx.NoContent(http.StatusNoContent) })
+	}))
+
+	prepared, err := app.Prepare(context.Background(), boot.Options{
 		Address: "prepare-must-not-listen",
 		HTTP:    &boot.HTTPOptions{},
 	})

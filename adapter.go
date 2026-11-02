@@ -129,9 +129,9 @@ func simpleRecover() echo.MiddlewareFunc {
 			defer func() {
 				if r := recover(); r != nil {
 					c.Logger().ErrorContext(c.Request().Context(), "panic recovered", "panic", r)
-					_ = c.JSON(http.StatusInternalServerError, map[string]any{
-						"message": "Internal server error",
-					})
+					_ = c.JSON(http.StatusInternalServerError, struct {
+						Message string `json:"message"`
+					}{Message: "Internal server error"})
 				}
 			}()
 			return next(c)

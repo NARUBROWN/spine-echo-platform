@@ -1,6 +1,7 @@
 package platform
 
 import (
+	"encoding/json"
 	adapter "github.com/NARUBROWN/spine/adapter"
 	"github.com/labstack/echo/v5"
 )
@@ -15,7 +16,7 @@ func newEchoResponseWriter(ctx *echo.Context) *echoResponseWriter {
 	return &echoResponseWriter{ctx: ctx}
 }
 
-func (w *echoResponseWriter) WriteJSON(status int, value any) error {
+func (w *echoResponseWriter) WriteJSON(status int, value json.RawMessage) error {
 	return w.ctx.JSON(status, value)
 }
 

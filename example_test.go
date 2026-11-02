@@ -1,6 +1,7 @@
 package platform_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http/httptest"
 
@@ -12,7 +13,11 @@ func ExampleNewFactory() {
 	server, err := platform.NewFactory().New(adapter.Config{
 		Execute: func(ctx adapter.HTTPContext) error {
 			writer := ctx.Writer()
-			return writer.WriteJSON(200, map[string]string{"method": ctx.Method()})
+			body, err := json.Marshal(map[string]string{"method": ctx.Method()})
+			if err != nil {
+				return err
+			}
+			return writer.WriteJSON(200, body)
 		},
 	})
 	if err != nil {

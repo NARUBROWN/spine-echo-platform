@@ -24,21 +24,20 @@ func main() {
 
 NewFactory는 `github.com/NARUBROWN/spine/adapter.Factory`를 제공합니다. 구성 시 fallback, WS GET 경로, native 훅 순으로 마운트합니다. DTO 바인딩과 multipart 파싱, 실제 응답 출력과 HTTP 서버 종료를 처리합니다. Spine의 응답 staging과 WS 메시지 엔진은 커널에 남습니다.
 
-app.Transport는 `github.com/labstack/echo/v5`의 `*echo.Echo`를 전달합니다. native 경로는 Spine의 HTTP 인터셉터, 본문 제한과 staging을 거치지 않습니다. native store와 Spine 요청 store는 별개이므로 공유 요청 값은 표준 context를 사용합니다.
+`WithEcho`는 `github.com/labstack/echo/v5`의 `*echo.Echo`를 받는 typed 플랫폼 옵션입니다. native 경로는 Spine의 HTTP 인터셉터, 본문 제한과 staging을 거치지 않습니다. native store와 Spine 요청 store는 별개이므로 공유 요청 값은 표준 context를 사용합니다.
 
 ## Native Echo v5 확장
 
-Spine의 공개 adapter 계약과 컨트롤러 등록 API는 유지합니다. native Echo 확장 코드는 v5 import와 포인터 Context를 사용합니다.
+현재 개발 코드는 Spine의 HTTP adapter v2 계약을 사용합니다. 생성자·컨트롤러 등록 API는 유지합니다. native Echo 확장 코드는 v5 import와 포인터 Context를 사용합니다.
 
 ```go
 import "github.com/labstack/echo/v5"
 
-app.Transport(func(native any) {
-    e := native.(*echo.Echo)
+app := platform.New(platform.WithEcho(func(e *echo.Echo) {
     e.GET("/native", func(ctx *echo.Context) error {
         return ctx.String(200, "native")
     })
-})
+}))
 ```
 
 - handler와 middleware는 `*echo.Context`를 받습니다.
@@ -46,11 +45,15 @@ app.Transport(func(native any) {
 - logger는 표준 `log/slog`를 사용합니다.
 - 경로 인자는 `PathValues()`로 조회합니다. `Response()`는 `http.ResponseWriter`를 반환하며 Echo의 상태가 필요하면 `echo.UnwrapResponse`를 사용합니다. native middleware의 응답 wrapper도 `Unwrap() http.ResponseWriter`를 제공해야 합니다.
 
+`NewFactory(options...)`, `Option(options...)`와 `New(options...)`는 같은 Echo 옵션을 받습니다. 옵션 등록·기능 검사는 함수를 실행하지 않으며, 각 준비에서 fallback·WS 경로를 등록한 뒤 순서대로 한 번 실행합니다. nil 함수는 준비 단계에서 거부합니다.
+
+응답 `WriteJSON`은 core에서 직렬화한 `json.RawMessage`만 받습니다. Echo의 JSON 출력 경로를 유지하므로 개행·pretty 출력과 사용자 JSONSerializer도 적용됩니다. 사용자 serializer에는 원래 DTO 대신 RawMessage가 전달되므로 이 타입을 처리해야 합니다. v1의 `Config.NativeHooks`와 `App.Transport`는 사용하지 않습니다.
+
 플랫폼은 v5의 HTTP 상태 코드 인터페이스를 통해 입력 오류의 상태와 원인을 보존합니다. WS 업그레이드에는 원래 HTTP writer를 전달합니다. 서버 실행과 종료는 플랫폼이 소유한 `http.Server`가 처리합니다.
 
 ## 리스너 없이 앱 준비
 
-`platform.New()`로 만든 앱은 `spine.Prepare(ctx, app, options)`를 지원합니다. HTTP 옵션을 지정하면 준비 결과의 `Handler()`를 외부 HTTP 서버나 `httptest`에 연결할 수 있습니다. 준비 과정에서는 리스너를 열거나 consumer와 custom transport를 시작하지 않습니다. 설정에 따라 broker readiness와 custom Init은 실행될 수 있습니다.
+`platform.New()`가 반환하는 `spine.App`은 `app.Prepare(ctx, options)`를 직접 제공합니다. HTTP 옵션을 지정하면 준비 결과의 `Handler()`를 외부 HTTP 서버나 `httptest`에 연결할 수 있습니다. 준비 과정에서는 리스너를 열거나 consumer와 custom transport를 시작하지 않습니다. 설정에 따라 broker readiness와 custom Init은 실행될 수 있습니다.
 
 준비 결과는 호출자가 `Close(ctx)`로 정리합니다. Close를 시작하면 새 요청은 503을 받고, 진행 중인 요청이 끝난 뒤 프레임워크 자원을 정리합니다. 대기 시간이 초과돼도 정리는 계속되므로 다시 Close를 호출해 완료를 기다릴 수 있습니다. 외부 서버의 listener는 호출자가 종료합니다.
 
@@ -66,9 +69,9 @@ VscodeProjects/
 
 go.mod는 공개된 Spine 커밋의 Go 의사버전을 사용하며 로컬 replace를 포함하지 않습니다. 커널과 함께 개발하려면 위 배치에서 go work init . ../spine으로 로컬 workspace를 만들거나, 기존 go.work의 replace에 기능 worktree 경로를 지정합니다. 로컬 go.work는 커밋하지 않습니다.
 
-현재는 이슈 #9의 개발 스냅샷이며 정식 릴리스 태그는 아직 없습니다. Spine 의존성은 Prepare API를 포함하는 `v0.5.3-0.20261101161224-490135eda06f`으로 고정합니다. 의존성 설치와 테스트는 로컬 replace 없이도 실행할 수 있습니다.
+현재는 이슈 #9의 공개 개발 스냅샷이며 정식 릴리스 태그는 아직 없습니다. Spine 의존성은 v2 계약과 App.Prepare를 제공하는 `v0.5.3-0.20261102012946-eed61dc88259`으로 고정합니다. go.work와 로컬 replace 없이 고정한 공개 버전으로 빌드합니다.
 
-개발 스냅샷은 다음 명령으로 가져옵니다. go get은 현재 main 커밋을 Go 의사버전으로 기록합니다.
+다음 명령은 현재 main 커밋을 Go 의사버전으로 기록합니다.
 
 ```sh
 go get github.com/NARUBROWN/spine-echo-platform@main
@@ -78,7 +81,7 @@ go get github.com/NARUBROWN/spine-echo-platform@main
 
 ```sh
 GOWORK=off go mod verify
-GOWORK=off go test -race ./... -count=1
+go test -race ./... -count=1
 ```
 
-CI도 go.work와 로컬 replace 없이 공개 Spine 버전으로 모듈 정합성, vet와 race 테스트를 검사합니다.
+공개 CI는 go.work와 로컬 replace 없이 고정한 공개 Spine 버전으로 검사합니다.
