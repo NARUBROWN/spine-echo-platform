@@ -4,6 +4,30 @@ Spine v0.6.0용 Echo v5.4.4 HTTP 플랫폼과 편의 생성자를 제공합니�
 
 플랫폼 모듈은 Spine과 Echo를 의존성으로 가져오고, Spine의 공개 `adapter` 계약을 구현하는 EchoAdapter를 제공합니다. 계약은 Spine 모듈에 포함되며 별도 계약 모듈이나 저장소를 요구하지 않습니다.
 
+## Spine CLI로 시작하기
+
+Spine `v0.6.0`부터 새 프로젝트의 공식 생성 경로는 Spine CLI의 `new`입니다. [CLI `v0.4.0`](https://github.com/NARUBROWN/spine-cli/releases/tag/v0.4.0)은 Spine `v0.6.0`, Echo 플랫폼 `v0.1.0`과 Echo `v5.4.4`를 함께 구성합니다.
+
+```sh
+go install github.com/NARUBROWN/spine-cli/cmd/spine@v0.4.0
+spine version
+spine new todo-api --module github.com/acme/todo-api
+cd todo-api
+spine dev
+```
+
+다른 터미널에서 `curl http://localhost:8080/health`로 `200 OK`와 `{"status":"ok"}` 응답을 확인합니다. 생성된 `go.mod`에는 Spine `v0.6.0`과 플랫폼 `v0.1.0`이 있어야 합니다.
+
+`new`는 기본으로 플랫폼 연결, 의존성 설치, 정적 계약 검사와 빌드를 완료한 뒤 프로젝트를 생성합니다. 서버는 `spine dev`로 시작합니다. `--skip-install`로 파일만 생성했다면 `go mod tidy`를 별도로 실행하세요.
+
+## 기존 앱에 직접 플랫폼 연결
+
+기존 Go 모듈에 수동으로 연결할 때 플랫폼 의존성을 추가합니다.
+
+```sh
+go get github.com/NARUBROWN/spine-echo-platform@v0.1.0
+```
+
 ```go
 import (
     "log"
@@ -67,15 +91,9 @@ VscodeProjects/
   spine-echo-platform/
 ```
 
-go.mod는 공개된 Spine 커밋의 Go 의사버전을 사용하며 로컬 replace를 포함하지 않습니다. 커널과 함께 개발하려면 위 배치에서 go work init . ../spine으로 로컬 workspace를 만들거나, 기존 go.work의 replace에 기능 worktree 경로를 지정합니다. 로컬 go.work는 커밋하지 않습니다.
+go.mod는 공개된 Spine `v0.6.0`을 사용하며 로컬 replace를 포함하지 않습니다. 커널과 함께 개발하려면 위 배치에서 go work init . ../spine으로 로컬 workspace를 만들거나, 기존 go.work의 replace에 기능 worktree 경로를 지정합니다. 로컬 go.work는 커밋하지 않습니다.
 
 v0.1.0은 Spine `v0.6.0`을 사용합니다. go.work와 로컬 replace 없이 고정한 공개 버전으로 설치하고 빌드합니다.
-
-다음 명령으로 Echo 플랫폼을 설치합니다.
-
-```sh
-go get github.com/NARUBROWN/spine-echo-platform@v0.1.0
-```
 
 [관련 이슈](https://github.com/NARUBROWN/spine/issues/9)와 [최소 E2E 예제](https://github.com/NARUBROWN/spine/tree/v0.6.0/cmd/demo)를 참고하세요.
 
