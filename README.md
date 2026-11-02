@@ -1,6 +1,6 @@
 # spine-echo-platform
 
-Echo v5.4.4 기반 HTTP 플랫폼과 Spine 편의 생성자를 제공합니다. Go 패키지 이름은 `platform`이며 Go 1.25.5 이상을 사용합니다.
+Spine v0.6.0용 Echo v5.4.4 HTTP 플랫폼과 편의 생성자를 제공합니다. Go 패키지 이름은 `platform`이며 Go 1.25.5 이상을 사용합니다.
 
 플랫폼 모듈은 Spine과 Echo를 의존성으로 가져오고, Spine의 공개 `adapter` 계약을 구현하는 EchoAdapter를 제공합니다. 계약은 Spine 모듈에 포함되며 별도 계약 모듈이나 저장소를 요구하지 않습니다.
 
@@ -28,7 +28,7 @@ NewFactory는 `github.com/NARUBROWN/spine/adapter.Factory`를 제공합니다. �
 
 ## Native Echo v5 확장
 
-현재 개발 코드는 Spine의 HTTP adapter v2 계약을 사용합니다. 생성자·컨트롤러 등록 API는 유지합니다. native Echo 확장 코드는 v5 import와 포인터 Context를 사용합니다.
+v0.1.0은 Spine의 HTTP adapter v2 계약을 사용합니다. 생성자·컨트롤러 등록 API는 유지합니다. native Echo 확장 코드는 v5 import와 포인터 Context를 사용합니다.
 
 ```go
 import "github.com/labstack/echo/v5"
@@ -57,7 +57,7 @@ app := platform.New(platform.WithEcho(func(e *echo.Echo) {
 
 준비 결과는 호출자가 `Close(ctx)`로 정리합니다. Close를 시작하면 새 요청은 503을 받고, 진행 중인 요청이 끝난 뒤 프레임워크 자원을 정리합니다. 대기 시간이 초과돼도 정리는 계속되므로 다시 Close를 호출해 완료를 기다릴 수 있습니다. 외부 서버의 listener는 호출자가 종료합니다.
 
-API와 자원 소유권은 [개발 브랜치의 Spine 전환 안내](https://github.com/NARUBROWN/spine/blob/feat/9-echo-adapter-contract/docs/migration/http-adapter-modules.md#리스너-없이-앱-준비하기)를 참고하세요.
+API와 자원 소유권은 [Spine v0.6.0 전환 안내](https://github.com/NARUBROWN/spine/blob/v0.6.0/docs/migration/http-adapter-modules.md#리스너-없이-앱-준비하기)를 참고하세요.
 
 ## 개발 저장소 구성
 
@@ -69,19 +69,19 @@ VscodeProjects/
 
 go.mod는 공개된 Spine 커밋의 Go 의사버전을 사용하며 로컬 replace를 포함하지 않습니다. 커널과 함께 개발하려면 위 배치에서 go work init . ../spine으로 로컬 workspace를 만들거나, 기존 go.work의 replace에 기능 worktree 경로를 지정합니다. 로컬 go.work는 커밋하지 않습니다.
 
-현재는 이슈 #9의 공개 개발 스냅샷이며 정식 릴리스 태그는 아직 없습니다. Spine 의존성은 v2 계약과 App.Prepare를 제공하는 `v0.5.3-0.20261102012946-eed61dc88259`으로 고정합니다. go.work와 로컬 replace 없이 고정한 공개 버전으로 빌드합니다.
+v0.1.0은 Spine `v0.6.0`을 사용합니다. go.work와 로컬 replace 없이 고정한 공개 버전으로 설치하고 빌드합니다.
 
-다음 명령은 현재 main 커밋을 Go 의사버전으로 기록합니다.
+다음 명령으로 Echo 플랫폼을 설치합니다.
 
 ```sh
-go get github.com/NARUBROWN/spine-echo-platform@main
+go get github.com/NARUBROWN/spine-echo-platform@v0.1.0
 ```
 
-[관련 이슈](https://github.com/NARUBROWN/spine/issues/9)와 [최소 E2E 예제](https://github.com/NARUBROWN/spine/tree/feat/9-echo-adapter-contract/cmd/demo)를 참고하세요.
+[관련 이슈](https://github.com/NARUBROWN/spine/issues/9)와 [최소 E2E 예제](https://github.com/NARUBROWN/spine/tree/v0.6.0/cmd/demo)를 참고하세요.
 
 ```sh
 GOWORK=off go mod verify
-go test -race ./... -count=1
+GOWORK=off go test -race ./... -count=1
 ```
 
 공개 CI는 go.work와 로컬 replace 없이 고정한 공개 Spine 버전으로 검사합니다.
