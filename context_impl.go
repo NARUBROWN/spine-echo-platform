@@ -68,7 +68,31 @@ func (c *echoContext) Params() map[string]string {
 	return params
 }
 
-func (c *echoContext) Bind(out any) error { return normalizeRequestError(c.echo.Bind(out)) }
+func (c *echoContext) Bind(out any) error {
+	if _, standard := c.echo.Echo().Binder.(*echo.DefaultBinder); !standard {
+		return normalizeRequestError(c.echo.Bind(out))
+	}
+	request := c.echo.Request()
+	media, _, _ := strings.Cut(request.Header.Get("Content-Type"), ";")
+	if strings.TrimSpace(media) != echo.MIMEApplicationForm {
+		return normalizeRequestError(echo.BindBody(c.echo, out))
+	}
+	// ParseForm의 URL 병합을 차단하고 이미 읽은 본문 값은 재사용합니다.
+	bodyRequest := new(http.Request)
+	*bodyRequest = *request
+	url := *request.URL
+	url.RawQuery = ""
+	bodyRequest.URL = &url
+	bodyRequest.Form = request.PostForm
+	c.echo.SetRequest(bodyRequest)
+	defer func() {
+		if request.PostForm == nil {
+			request.PostForm = bodyRequest.PostForm
+		}
+		c.echo.SetRequest(request)
+	}()
+	return normalizeRequestError(echo.BindBody(c.echo, out))
+}
 
 func (c *echoContext) MultipartForm() (*multipart.Form, error) {
 	form, err := c.echo.MultipartForm()

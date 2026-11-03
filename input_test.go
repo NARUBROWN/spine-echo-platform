@@ -81,3 +81,38 @@ func TestRawQueryPreservesEscapingBeforeDecodedViews(t *testing.T) {
 		}
 	}
 }
+
+func TestDefaultBindingReadsOnlyFormBodyAndRestoresNativeRequest(t *testing.T) {
+	for _, parsed := range []bool{false, true} {
+		request := httptest.NewRequest("POST", "/?id=from-query", strings.NewReader("other=body"))
+		request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		if parsed {
+			if err := request.ParseForm(); err != nil {
+				t.Fatal(err)
+			}
+		}
+		ctx := newEcho(normalizedHTTPOptions{}).NewContext(request, httptest.NewRecorder())
+		scope := newContext(ctx)
+		var body struct {
+			ID string `form:"id"`
+		}
+		if err := scope.Bind(&body); err != nil || body.ID != "" {
+			t.Fatalf("쿼리를 폼 본문에 병합하면 안 됩니다: %+v %v", body, err)
+		}
+		if ctx.Request() != request || scope.Query("id") != "from-query" {
+			t.Fatal("native 요청과 별도 쿼리 조회를 보존해야 합니다")
+		}
+		if err := request.ParseForm(); err != nil || request.Form.Get("other") != "body" {
+			t.Fatalf("후속 native 본문 조회: %v", err)
+		}
+	}
+	request := httptest.NewRequest("POST", "/?id=%ZZ", strings.NewReader("id=from-body"))
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	scope := newContext(newEcho(normalizedHTTPOptions{}).NewContext(request, httptest.NewRecorder()))
+	var body struct {
+		ID string `form:"id"`
+	}
+	if err := scope.Bind(&body); err != nil || body.ID != "from-body" {
+		t.Fatalf("쿼리 인코딩 오류가 본문 바인딩에 영향을 주면 안 됩니다: %+v %v", body, err)
+	}
+}
