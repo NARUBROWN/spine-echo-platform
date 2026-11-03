@@ -75,6 +75,16 @@ app := platform.New(platform.WithEcho(func(e *echo.Echo) {
 
 플랫폼은 v5의 HTTP 상태 코드 인터페이스를 통해 입력 오류의 상태와 원인을 보존합니다. WS 업그레이드에는 원래 HTTP writer를 전달합니다. 서버 실행과 종료는 플랫폼이 소유한 `http.Server`가 처리합니다.
 
+## 개발 브랜치의 입력 바인딩
+
+Host 조회는 Go의 `Request.Host`를 별도로 읽습니다. `Header("Host")`와 `Headers()["Host"]`는 같은 요청 값을 제공하며 대소문자가 다른 Host 이름도 같은 값으로 처리합니다. 포트는 보존하고 `X-Forwarded-Host`로 대체하지 않습니다. 조회 맵을 변경해도 원래 요청 헤더는 변경되지 않습니다.
+
+기본 JSON 디코더는 Spine의 `pkg/jsonx.Unmarshal`을 사용합니다. `int`, `bool`, `string`과 일반 구조체, 배열에 보낸 명시적 null은 400 입력 오류로 거부합니다. 중첩 필드와 컬렉션 원소에도 같은 규칙을 적용합니다. 필드 누락, 포인터와 map, slice의 null은 보존하고 필수 여부는 validator가 판단합니다. 사용자 정의 `json.Unmarshaler`는 자신의 null 처리를 유지합니다.
+
+`WithEcho`로 JSONSerializer나 Binder를 교체하면 해당 구현이 입력 디코딩을 소유합니다. 기본 serializer의 응답 인코딩, 요청 크기 제한과 HTTP 오류 변환은 유지합니다.
+
+이 변경은 공개된 `v0.1.0`에 포함되지 않습니다. `pkg/jsonx`를 포함한 Spine 개발 브랜치와 로컬 workspace에서 함께 검증해야 하며, 공개 배포 전에 해당 Spine 버전으로 의존성을 갱신해야 합니다.
+
 ## 리스너 없이 앱 준비
 
 `platform.New()`가 반환하는 `spine.App`은 `app.Prepare(ctx, options)`를 직접 제공합니다. HTTP 옵션을 지정하면 준비 결과의 `Handler()`를 외부 HTTP 서버나 `httptest`에 연결할 수 있습니다. 준비 과정에서는 리스너를 열거나 consumer와 custom transport를 시작하지 않습니다. 설정에 따라 broker readiness와 custom Init은 실행될 수 있습니다.

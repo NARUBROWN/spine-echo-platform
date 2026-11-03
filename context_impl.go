@@ -5,6 +5,7 @@ import (
 	"errors"
 	"mime/multipart"
 	"net/http"
+	"strings"
 
 	adapter "github.com/NARUBROWN/spine/adapter"
 	"github.com/labstack/echo/v5"
@@ -28,9 +29,33 @@ func (c *echoContext) Path() string                   { return c.echo.Request().
 func (c *echoContext) Param(name string) string       { return c.echo.Param(name) }
 func (c *echoContext) Query(name string) string       { return c.echo.QueryParam(name) }
 func (c *echoContext) Queries() map[string][]string   { return c.echo.QueryParams() }
-func (c *echoContext) Header(name string) string      { return c.echo.Request().Header.Get(name) }
-func (c *echoContext) Headers() map[string][]string   { return c.echo.Request().Header }
 func (c *echoContext) Writer() adapter.ResponseWriter { return c.writer }
+
+func (c *echoContext) Header(name string) string {
+	if strings.EqualFold(name, "Host") {
+		return c.echo.Request().Host
+	}
+	return c.echo.Request().Header.Get(name)
+}
+
+func (c *echoContext) Headers() map[string][]string {
+	request := c.echo.Request()
+	headers := request.Header.Clone()
+	if headers == nil {
+		headers = make(http.Header)
+	}
+	// Host는 Go가 헤더 맵에서 분리한 요청 필드를 사용합니다.
+	// 조회 뷰만 보충하고 원래 요청 헤더는 변경하지 않습니다.
+	for name := range headers {
+		if strings.EqualFold(name, "Host") {
+			delete(headers, name)
+		}
+	}
+	if request.Host != "" {
+		headers.Set("Host", request.Host)
+	}
+	return headers
+}
 
 func (c *echoContext) Params() map[string]string {
 	values := c.echo.PathValues()
