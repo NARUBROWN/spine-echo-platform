@@ -64,3 +64,20 @@ func TestJSONBindingRejectsScalarNullWithRequestError(t *testing.T) {
 		}
 	}
 }
+
+func TestRawQueryPreservesEscapingBeforeDecodedViews(t *testing.T) {
+	for _, raw := range []string{"tags=a%2Cb,%20c&tags=d", ""} {
+		request := httptest.NewRequest(http.MethodGet, "/?"+raw, nil)
+		scope := newContext(newEcho(normalizedHTTPOptions{}).NewContext(request, httptest.NewRecorder()))
+		source, ok := scope.(adapter.RawQueryContext)
+		if !ok {
+			t.Fatal("원시 쿼리 조회 계약을 제공해야 합니다")
+		}
+		if got, available := source.RawQuery(); !available || got != raw {
+			t.Fatalf("빈 쿼리와 인코딩을 보존해야 합니다: %q %v", got, available)
+		}
+		if raw != "" && !reflect.DeepEqual(scope.Queries()["tags"], []string{"a,b, c", "d"}) {
+			t.Fatal("기존 Queries는 디코딩된 뷰를 유지해야 합니다")
+		}
+	}
+}

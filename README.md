@@ -79,6 +79,8 @@ app := platform.New(platform.WithEcho(func(e *echo.Echo) {
 
 Host 조회는 Go의 `Request.Host`를 별도로 읽습니다. `Header("Host")`와 `Headers()["Host"]`는 같은 요청 값을 제공하며 대소문자가 다른 Host 이름도 같은 값으로 처리합니다. 포트는 보존하고 `X-Forwarded-Host`로 대체하지 않습니다. 조회 맵을 변경해도 원래 요청 헤더는 변경되지 않습니다.
 
+선택적 `RawQueryContext`는 `Request.URL.RawQuery`를 디코딩하지 않고 코어로 전달합니다. 쿼리 슬라이스는 반복 키와 쉼표 구분을 함께 지원합니다. `tags=a,b`는 두 원소, `tags=a%2Cb`는 쉼표를 포함한 한 원소로 바인딩하며 `tags=a,%20b`의 두 번째 원소는 앞 공백을 유지합니다. 일반 Query와 Queries 조회는 기존처럼 URL 디코딩된 값을 반환합니다.
+
 기본 JSON 디코더는 Spine의 `pkg/jsonx.Unmarshal`을 사용합니다. `int`, `bool`, `string`과 일반 구조체, 배열에 보낸 명시적 null은 400 입력 오류로 거부합니다. 중첩 필드와 컬렉션 원소에도 같은 규칙을 적용합니다. 필드 누락, 포인터와 map, slice의 null은 보존하고 필수 여부는 validator가 판단합니다. 사용자 정의 `json.Unmarshaler`는 자신의 null 처리를 유지합니다.
 
 `WithEcho`로 JSONSerializer나 Binder를 교체하면 해당 구현이 입력 디코딩을 소유합니다. 기본 serializer의 응답 인코딩, 요청 크기 제한과 HTTP 오류 변환은 유지합니다.

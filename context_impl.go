@@ -18,6 +18,7 @@ type echoContext struct {
 }
 
 var _ adapter.HTTPContext = (*echoContext)(nil)
+var _ adapter.RawQueryContext = (*echoContext)(nil)
 
 func newContext(c *echo.Context) adapter.HTTPContext {
 	return &echoContext{echo: c, reqCtx: c.Request().Context(), writer: newEchoResponseWriter(c)}
@@ -29,6 +30,7 @@ func (c *echoContext) Path() string                   { return c.echo.Request().
 func (c *echoContext) Param(name string) string       { return c.echo.Param(name) }
 func (c *echoContext) Query(name string) string       { return c.echo.QueryParam(name) }
 func (c *echoContext) Queries() map[string][]string   { return c.echo.QueryParams() }
+func (c *echoContext) RawQuery() (string, bool)       { return c.echo.Request().URL.RawQuery, true }
 func (c *echoContext) Writer() adapter.ResponseWriter { return c.writer }
 
 func (c *echoContext) Header(name string) string {
