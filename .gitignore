@@ -8,3 +8,5 @@ dist/
 *.prof
 .DS_Store
 /docs/work/
+
+__pycache__/
