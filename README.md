@@ -1,5 +1,7 @@
 # spine-echo-platform
 
+> 이 작업 소스의 대상 버전은 `v0.2.0`이며 Preview, RC, 정식 채널로 발행합니다. [릴리스 운영](RELEASING.md)을 확인하세요. 기존 정식 `v0.1.0`은 변경하지 않습니다.
+
 Spine v0.6.0용 Echo v5.4.4 HTTP 플랫폼과 편의 생성자를 제공합니다. Go 패키지 이름은 `platform`이며 Go 1.25.5 이상을 사용합니다.
 
 플랫폼 모듈은 Spine과 Echo를 의존성으로 가져오고, Spine의 공개 `adapter` 계약을 구현하는 EchoAdapter를 제공합니다. 계약은 Spine 모듈에 포함되며 별도 계약 모듈이나 저장소를 요구하지 않습니다.
@@ -75,6 +77,18 @@ app := platform.New(platform.WithEcho(func(e *echo.Echo) {
 
 플랫폼은 v5의 HTTP 상태 코드 인터페이스를 통해 입력 오류의 상태와 원인을 보존합니다. WS 업그레이드에는 원래 HTTP writer를 전달합니다. 서버 실행과 종료는 플랫폼이 소유한 `http.Server`가 처리합니다.
 
+## 개발 브랜치의 입력 바인딩
+
+Host 조회는 Go의 `Request.Host`를 별도로 읽습니다. `Header("Host")`와 `Headers()["Host"]`는 같은 요청 값을 제공하며 대소문자가 다른 Host 이름도 같은 값으로 처리합니다. 포트는 보존하고 `X-Forwarded-Host`로 대체하지 않습니다. 조회 맵을 변경해도 원래 요청 헤더는 변경되지 않습니다.
+
+선택적 `RawQueryContext`는 `Request.URL.RawQuery`를 디코딩하지 않고 코어로 전달합니다. 쿼리 슬라이스는 반복 키와 쉼표 구분을 함께 지원합니다. `tags=a,b`는 두 원소, `tags=a%2Cb`는 쉼표를 포함한 한 원소로 바인딩하며 `tags=a,%20b`의 두 번째 원소는 앞 공백을 유지합니다. 일반 Query와 Queries 조회는 기존처럼 URL 디코딩된 값을 반환합니다.
+
+기본 JSON 디코더는 Spine의 `pkg/jsonx.Unmarshal`을 사용합니다. `int`, `bool`, `string`과 일반 구조체, 배열에 보낸 명시적 null은 400 입력 오류로 거부합니다. 중첩 필드와 컬렉션 원소에도 같은 규칙을 적용합니다. 필드 누락, 포인터와 map, slice의 null은 보존하고 필수 여부는 validator가 판단합니다. 사용자 정의 `json.Unmarshaler`는 자신의 null 처리를 유지합니다.
+
+`WithEcho`로 JSONSerializer나 Binder를 교체하면 해당 구현이 입력 디코딩을 소유합니다. 기본 serializer의 응답 인코딩, 요청 크기 제한과 HTTP 오류 변환은 유지합니다.
+
+이 변경은 공개된 `v0.1.0`에 포함되지 않습니다. `pkg/jsonx`를 포함한 Spine 개발 브랜치와 로컬 workspace에서 함께 검증해야 하며, 공개 배포 전에 해당 Spine 버전으로 의존성을 갱신해야 합니다.
+
 ## 리스너 없이 앱 준비
 
 `platform.New()`가 반환하는 `spine.App`은 `app.Prepare(ctx, options)`를 직접 제공합니다. HTTP 옵션을 지정하면 준비 결과의 `Handler()`를 외부 HTTP 서버나 `httptest`에 연결할 수 있습니다. 준비 과정에서는 리스너를 열거나 consumer와 custom transport를 시작하지 않습니다. 설정에 따라 broker readiness와 custom Init은 실행될 수 있습니다.
@@ -91,7 +105,7 @@ VscodeProjects/
   spine-echo-platform/
 ```
 
-go.mod는 공개된 Spine `v0.6.0`을 사용하며 로컬 replace를 포함하지 않습니다. 커널과 함께 개발하려면 위 배치에서 go work init . ../spine으로 로컬 workspace를 만들거나, 기존 go.work의 replace에 기능 worktree 경로를 지정합니다. 로컬 go.work는 커밋하지 않습니다.
+현재 작업 소스의 go.mod는 Spine `v0.7.0-preview.1`을 사용하며 로컬 replace를 포함하지 않습니다. 이 태그의 발행 전후 검증은 [릴리스 운영](RELEASING.md)을 따릅니다. 커널과 함께 개발하려면 위 배치에서 go work init . ../spine으로 로컬 workspace를 만들거나, 기존 go.work의 replace에 기능 worktree 경로를 지정합니다. 로컬 go.work는 커밋하지 않습니다.
 
 v0.1.0은 Spine `v0.6.0`을 사용합니다. go.work와 로컬 replace 없이 고정한 공개 버전으로 설치하고 빌드합니다.
 

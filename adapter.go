@@ -114,7 +114,8 @@ func normalizeHTTPOptions(opts adapter.ServerOptions) normalizedHTTPOptions {
 
 func newEcho(opts normalizedHTTPOptions) *echo.Echo {
 	e := echo.NewWithConfig(echo.Config{
-		Logger: slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError})),
+		Logger:         slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError})),
+		JSONSerializer: jsonSerializer{},
 	})
 	if !opts.DisableRecover {
 		e.Use(simpleRecover())
