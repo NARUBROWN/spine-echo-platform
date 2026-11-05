@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"slices"
 
-	adapter "github.com/NARUBROWN/spine/adapter"
+	adapter "github.com/NARUBROWN/spine/contract/http"
 	"github.com/labstack/echo/v5"
 )
 
@@ -39,24 +39,24 @@ func NewFactory(options ...EchoOption) adapter.Factory {
 
 func (factory) Capabilities() adapter.Capabilities {
 	return adapter.Capabilities{
-		ContractVersion:  adapter.ContractVersion,
-		WebSocketUpgrade: true,
+		ContractVersion: adapter.ContractVersion,
+		NetHTTPHandler:  true, NetHTTPUpgrade: true, ClientDisconnectCancellation: true,
+		ServerOptions: adapter.ServerOptionSupport{DisableRecover: true, ReadHeaderTimeout: true, ReadTimeout: true, WriteTimeout: true, IdleTimeout: true, MaxHeaderBytes: true},
 	}
 }
 
 func (f factory) New(config adapter.Config) (adapter.HTTPAdapter, error) {
-	upgrades := slices.Clone(config.Upgrades)
+	return f.NewWithNetHTTPUpgrades(config, nil)
+}
+
+func (f factory) NewWithNetHTTPUpgrades(config adapter.Config, routes []adapter.NetHTTPUpgradeRoute) (adapter.HTTPAdapter, error) {
+	upgrades := slices.Clone(routes)
 	hooks := slices.Clone(f.hooks)
-	if config.Execute == nil {
-		return nil, fmt.Errorf("%w: Execute is nil", adapter.ErrInvalidAdapter)
-	}
-	if err := config.Options.Validate(); err != nil {
+	if err := config.Validate(f.Capabilities()); err != nil {
 		return nil, err
 	}
-	for i, route := range upgrades {
-		if route.Path == "" || isNil(route.Handler) {
-			return nil, fmt.Errorf("%w: Upgrades[%d] requires a path and handler", adapter.ErrInvalidAdapter, i)
-		}
+	if err := adapter.ValidateNetHTTPUpgradeRoutes(upgrades); err != nil {
+		return nil, err
 	}
 	for i, hook := range hooks {
 		if hook == nil {

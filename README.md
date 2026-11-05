@@ -1,5 +1,8 @@
 # spine-echo-platform
 
+> 이슈 #28 브랜치는 HTTP v3 계약과 공통 입력 파서로 이행 중입니다. 같은 계약으로 이행한 코어/Echo 소스를 함께 사용해야 하며, 공개 v2 조합에 소급 적용되지 않습니다. 코어 소스의 `docs/migration/http-v3.md`에서 입력 처리와 Prepare API 전환을 확인하세요.
+
+
 > 이 작업 소스의 대상 버전은 `v0.2.0`이며 Preview, RC, 정식 채널로 발행합니다. [릴리스 운영](RELEASING.md)을 확인하세요. 기존 정식 `v0.1.0`은 변경하지 않습니다.
 
 Spine v0.6.0용 Echo v5.4.4 HTTP 플랫폼과 편의 생성자를 제공합니다. Go 패키지 이름은 `platform`이며 Go 1.25.5 이상을 사용합니다.

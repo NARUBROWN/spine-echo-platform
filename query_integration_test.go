@@ -53,7 +53,7 @@ func TestSpineHTTPQueryListsPreserveItemBoundariesAndSpaces(t *testing.T) {
 				t.Fatal(err)
 			}
 			t.Cleanup(func() { _ = prepared.Close(context.Background()) })
-			server := httptest.NewServer(prepared.Handler())
+			server := httptest.NewServer(preparedHandler(t, prepared))
 			t.Cleanup(server.Close)
 			for _, test := range []struct {
 				path   string
