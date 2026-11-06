@@ -1,6 +1,6 @@
 # spine-echo-platform
 
-> 이슈 #28 브랜치는 HTTP v3 계약과 공통 입력 파서로 이행했습니다. 로컬 후보는 Echo `v0.2.0-preview.2`와 코어 `v0.7.0-preview.3`입니다. 같은 계약의 소스를 함께 사용해야 하며 공개 v2 조합에는 소급 적용되지 않습니다. 새 태그와 CLI v3 생성 지원은 아직 없으며, 코어 소스의 `docs/migration/http-v3.md`에서 입력 처리와 Prepare API 전환을 확인하세요.
+> HTTP 계약 `spine.http-adapter/v3`와 공통 입력 파서를 사용합니다. 이 소스의 Preview 조합은 Echo `v0.2.0-preview.3`와 코어 `v0.7.0-preview.4`입니다. HTTP v2 조합에는 소급 적용되지 않습니다. CLI `v0.4.3-preview.4`부터 Echo와 net/http 생성 및 업데이트를 지원합니다. 코어의 [HTTP v3 전환 안내](https://github.com/NARUBROWN/spine/blob/preview/docs/migration/http-v3.md)를 참고하세요.
 
 
 > 이 작업 소스의 대상 버전은 `v0.2.0`이며 Preview, RC, 정식 채널로 발행합니다. [릴리스 운영](RELEASING.md)을 확인하세요. 기존 정식 `v0.1.0`은 변경하지 않습니다.
@@ -80,7 +80,7 @@ TLS가 nil이면 평문 HTTP를 사용합니다. 주소를 생략하면 TLS는 `
 
 ## Native Echo v5 확장
 
-v0.1.0은 Spine의 HTTP adapter v2 계약을 사용합니다. 생성자·컨트롤러 등록 API는 유지합니다. native Echo 확장 코드는 v5 import와 포인터 Context를 사용합니다.
+v0.1.0은 Spine의 HTTP adapter v2 계약을 사용합니다. 생성자, 컨트롤러 등록 API는 유지합니다. native Echo 확장 코드는 v5 import와 포인터 Context를 사용합니다.
 
 ```go
 import "github.com/labstack/echo/v5"
@@ -97,9 +97,9 @@ app := platform.New(platform.WithEcho(func(e *echo.Echo) {
 - logger는 표준 `log/slog`를 사용합니다.
 - 경로 인자는 `PathValues()`로 조회합니다. `Response()`는 `http.ResponseWriter`를 반환하며 Echo의 상태가 필요하면 `echo.UnwrapResponse`를 사용합니다. native middleware의 응답 wrapper도 `Unwrap() http.ResponseWriter`를 제공해야 합니다.
 
-`NewFactory(options...)`, `Option(options...)`와 `New(options...)`는 같은 Echo 옵션을 받습니다. 옵션 등록·기능 검사는 함수를 실행하지 않으며, 각 준비에서 fallback·WS 경로를 등록한 뒤 순서대로 한 번 실행합니다. nil 함수는 준비 단계에서 거부합니다.
+`NewFactory(options...)`, `Option(options...)`와 `New(options...)`는 같은 Echo 옵션을 받습니다. 옵션 등록, 기능 검사는 함수를 실행하지 않으며, 각 준비에서 fallback, WS 경로를 등록한 뒤 순서대로 한 번 실행합니다. nil 함수는 준비 단계에서 거부합니다.
 
-응답 `WriteJSON`은 core에서 직렬화한 `json.RawMessage`만 받습니다. Echo의 JSON 출력 경로를 유지하므로 개행·pretty 출력과 사용자 JSONSerializer도 적용됩니다. 사용자 serializer에는 원래 DTO 대신 RawMessage가 전달되므로 이 타입을 처리해야 합니다. v1의 `Config.NativeHooks`와 `App.Transport`는 사용하지 않습니다.
+응답 `WriteJSON`은 core에서 직렬화한 `json.RawMessage`만 받습니다. Echo의 JSON 출력 경로를 유지하므로 개행, pretty 출력과 사용자 JSONSerializer도 적용됩니다. 사용자 serializer에는 원래 DTO 대신 RawMessage가 전달되므로 이 타입을 처리해야 합니다. v1의 `Config.NativeHooks`와 `App.Transport`는 사용하지 않습니다.
 
 플랫폼은 v5의 HTTP 상태 코드 인터페이스를 통해 입력 오류의 상태와 원인을 보존합니다. WS 업그레이드에는 원래 HTTP writer를 전달합니다. 서버 실행과 종료는 플랫폼이 소유한 `http.Server`가 처리합니다.
 
@@ -131,7 +131,7 @@ VscodeProjects/
   spine-echo-platform/
 ```
 
-현재 작업 소스의 go.mod는 Spine `v0.7.0-preview.3`을 사용하며 로컬 replace를 포함하지 않습니다. 아직 발행하지 않은 후보 조합이며 소스 CI는 고정한 코어 커밋을 사용합니다. 발행 전후 검증은 [릴리스 운영](RELEASING.md)을 따릅니다. 커널과 함께 개발하려면 위 배치에서 go work init . ../spine으로 로컬 workspace를 만들거나, 기존 go.work의 replace에 기능 worktree 경로를 지정합니다. 로컬 go.work는 커밋하지 않습니다.
+현재 작업 소스의 go.mod는 Spine `v0.7.0-preview.4`을 사용하며 로컬 replace를 포함하지 않습니다. 소스 CI는 고정한 코어 커밋을 사용합니다. 공개 태그의 검증 상태는 release manifest를 확인하세요. 발행 전후 검증은 [릴리스 운영](RELEASING.md)을 따릅니다. 커널과 함께 개발하려면 위 배치에서 go work init . ../spine으로 로컬 workspace를 만들거나, 기존 go.work의 replace에 기능 worktree 경로를 지정합니다. 로컬 go.work는 커밋하지 않습니다.
 
 v0.1.0은 Spine `v0.6.0`을 사용합니다. go.work와 로컬 replace 없이 고정한 공개 버전으로 설치하고 빌드합니다.
 
