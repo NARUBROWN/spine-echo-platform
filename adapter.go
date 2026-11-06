@@ -3,6 +3,7 @@ package platform
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -51,6 +52,7 @@ type EchoAdapter struct {
 	execute      adapter.ExecuteFunc
 	httpServer   *http.Server
 	maxBodyBytes int64
+	serveOptions adapter.ServeOptions
 
 	lifecycleMu  sync.Mutex
 	state        lifecycleState
@@ -160,28 +162,52 @@ func (s *EchoAdapter) Handler() http.Handler {
 
 // Serve는 리스너를 소유하고 인스턴스당 한 번 서버를 실행합니다.
 // 실제 서버 실행 중에는 상태 잠금을 유지하지 않습니다.
-func (s *EchoAdapter) Serve(listener net.Listener) error {
+func (s *EchoAdapter) Serve(listener net.Listener, options ...adapter.ServeOption) (serveErr error) {
 	if isNil(listener) {
 		return fmt.Errorf("%w: listener is nil", adapter.ErrInvalidState)
 	}
+	owned := &ownedListener{Listener: listener}
+	defer func() {
+		if closeErr := owned.Close(); closeErr != nil {
+			serveErr = errors.Join(serveErr, closeErr)
+		}
+	}()
 	if s == nil || s.httpServer == nil {
-		return errors.Join(fmt.Errorf("%w: EchoAdapter is not initialized", adapter.ErrInvalidAdapter), listener.Close())
+		return fmt.Errorf("%w: EchoAdapter is not initialized", adapter.ErrInvalidAdapter)
+	}
+	resolved, err := s.serveOptions.Resolve((factory{}).Capabilities(), options...)
+	if err != nil {
+		return err
 	}
 
 	s.lifecycleMu.Lock()
 	if s.state != stateReady {
 		s.lifecycleMu.Unlock()
-		return errors.Join(fmt.Errorf("%w: Serve requires a new adapter", adapter.ErrInvalidState), listener.Close())
+		return fmt.Errorf("%w: Serve requires a new adapter", adapter.ErrInvalidState)
 	}
 	s.state = stateServing
 	s.lifecycleMu.Unlock()
 
-	// http.Server.Serve는 정상 종료와 오류를 포함한 모든 반환 경로에서 리스너를 닫습니다.
-	err := s.httpServer.Serve(listener)
+	var native net.Listener = owned
+	if resolved.TLS != nil {
+		native = tls.NewListener(owned, resolved.TLS)
+	}
+	err = s.httpServer.Serve(native)
 	if errors.Is(err, http.ErrServerClosed) {
 		return adapter.ErrServerClosed
 	}
 	return err
+}
+
+type ownedListener struct {
+	net.Listener
+	once sync.Once
+	err  error
+}
+
+func (l *ownedListener) Close() error {
+	l.once.Do(func() { l.err = l.Listener.Close() })
+	return l.err
 }
 
 func (s *EchoAdapter) handle(c *echo.Context) error {

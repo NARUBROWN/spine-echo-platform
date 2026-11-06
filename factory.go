@@ -40,6 +40,7 @@ func NewFactory(options ...EchoOption) adapter.Factory {
 func (factory) Capabilities() adapter.Capabilities {
 	return adapter.Capabilities{
 		ContractVersion: adapter.ContractVersion,
+		TLS:             true,
 		NetHTTPHandler:  true, NetHTTPUpgrade: true, ClientDisconnectCancellation: true,
 		ServerOptions: adapter.ServerOptionSupport{DisableRecover: true, ReadHeaderTimeout: true, ReadTimeout: true, WriteTimeout: true, IdleTimeout: true, MaxHeaderBytes: true},
 	}
@@ -65,6 +66,7 @@ func (f factory) NewWithNetHTTPUpgrades(config adapter.Config, routes []adapter.
 	}
 
 	server := newAdapter(config.Execute, config.Options)
+	server.serveOptions = config.Serve.Clone()
 	server.echo.Any("/*", server.handle)
 	for _, route := range upgrades {
 		server.echo.GET(route.Path, func(c *echo.Context) error {
