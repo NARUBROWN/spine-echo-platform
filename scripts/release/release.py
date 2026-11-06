@@ -20,7 +20,7 @@ SHA = re.compile(r"[0-9a-f]{40}\Z")
 WORKFLOWS = {"preview": "preview.yml", "rc": "rc.yml", "stable": "release.yml"}
 CORE = "github.com/NARUBROWN/spine"
 PLATFORMS = {CORE + suffix for suffix in (
-    "-echo-platform", "-gorilla-platform", "-kafka-platform", "-rabbitmq-platform", "-validator-playground")}
+    "-echo-platform", "-nethttp-platform", "-gorilla-platform", "-kafka-platform", "-rabbitmq-platform", "-validator-playground")}
 MANAGED = {CORE, *PLATFORMS}
 
 
@@ -81,7 +81,7 @@ def validate_policy(policy):
         core_base = base
         modules = selected.get("modules", {})
         if kind == "core" and (base != policy["next_version"] or set(modules) != PLATFORMS):
-            raise ReleaseError("코어는 다섯 플랫폼의 채널별 버전을 모두 고정해야 합니다")
+            raise ReleaseError("코어는 모든 공식 플랫폼의 채널별 버전을 모두 고정해야 합니다")
         if kind == "platform" and modules:
             raise ReleaseError("플랫폼 릴리스는 코어 의존성만 지정합니다")
         for module, version in modules.items():
@@ -95,7 +95,7 @@ def validate_policy(policy):
         if module not in PLATFORMS or not SHA.fullmatch(sha):
             raise ReleaseError("소스 CI는 공식 플랫폼의 전체 커밋 SHA만 사용합니다")
     if kind == "core" and set(policy.get("ci_sources", {})) != PLATFORMS:
-        raise ReleaseError("코어 소스 CI에는 다섯 플랫폼의 커밋이 필요합니다")
+        raise ReleaseError("코어 소스 CI에는 모든 공식 플랫폼의 커밋이 필요합니다")
     if kind == "platform" and not SHA.fullmatch(policy.get("ci_core", "")):
         raise ReleaseError("플랫폼 소스 CI에는 코어의 전체 커밋 SHA가 필요합니다")
 

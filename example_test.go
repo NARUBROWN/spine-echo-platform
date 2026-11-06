@@ -26,7 +26,11 @@ func ExampleNewFactory() {
 
 	// 공개 계약과 Echo 구현만으로 리스너 없이 요청을 처리할 수 있습니다.
 	recorder := httptest.NewRecorder()
-	server.Handler().ServeHTTP(recorder, httptest.NewRequest("GET", "/", nil))
+	handler, err := adapter.NetHTTPHandler(server)
+	if err != nil {
+		panic(err)
+	}
+	handler.ServeHTTP(recorder, httptest.NewRequest("GET", "/", nil))
 	fmt.Println(recorder.Code)
 	fmt.Print(recorder.Body.String())
 

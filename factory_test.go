@@ -18,30 +18,28 @@ import (
 func TestFactoryRejectsInvalidConfigBeforeHooks(t *testing.T) {
 	for _, tt := range []struct {
 		name               string
-		change             func(*adapter.Config)
+		change             func(*testConfig)
 		configurationError bool
 	}{
-		{name: "nil_execute", change: func(c *adapter.Config) { c.Execute = nil }},
-		{name: "empty_upgrade_path", change: func(c *adapter.Config) {
-			c.Upgrades = []adapter.UpgradeRoute{{Handler: http.NotFoundHandler()}}
+		{name: "nil_execute", change: func(c *testConfig) { c.Execute = nil }},
+		{name: "empty_upgrade_path", change: func(c *testConfig) {
+			c.Upgrades = []adapter.NetHTTPUpgradeRoute{{Handler: http.NotFoundHandler()}}
 		}},
-		{name: "nil_upgrade_handler", change: func(c *adapter.Config) {
-			c.Upgrades = []adapter.UpgradeRoute{{Path: "/ws"}}
+		{name: "nil_upgrade_handler", change: func(c *testConfig) {
+			c.Upgrades = []adapter.NetHTTPUpgradeRoute{{Path: "/ws"}}
 		}},
-		{name: "typed_nil_upgrade_handler", change: func(c *adapter.Config) {
-			c.Upgrades = []adapter.UpgradeRoute{{Path: "/ws", Handler: http.HandlerFunc(nil)}}
+		{name: "typed_nil_upgrade_handler", change: func(c *testConfig) {
+			c.Upgrades = []adapter.NetHTTPUpgradeRoute{{Path: "/ws", Handler: http.HandlerFunc(nil)}}
 		}},
-		{name: "negative_header_limit", configurationError: true, change: func(c *adapter.Config) { c.Options.MaxHeaderBytes = -1 }},
-		{name: "negative_timeout", configurationError: true, change: func(c *adapter.Config) { c.Options.ReadTimeout = -time.Second }},
+		{name: "negative_header_limit", configurationError: true, change: func(c *testConfig) { c.Options.MaxHeaderBytes = -1 }},
+		{name: "negative_timeout", configurationError: true, change: func(c *testConfig) { c.Options.ReadTimeout = -time.Second }},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			calls := 0
 			sdkOptions := optionsForHooks([]func(*echo.Echo){func(*echo.Echo) { calls++ }})
-			config := adapter.Config{
-				Execute: func(adapter.HTTPContext) error { return nil },
-			}
+			config := testConfig{Execute: func(adapter.HTTPContext) error { return nil }}
 			tt.change(&config)
-			server, err := NewFactory(sdkOptions...).New(config)
+			server, err := NewFactory(sdkOptions...).(adapter.NetHTTPUpgradeFactory).NewWithNetHTTPUpgrades(config.contract(), config.Upgrades)
 			if server != nil || err == nil || calls != 0 {
 				t.Fatalf("잘못된 입력은 훅 실행 전에 실패해야 합니다: server=%v err=%v calls=%d", server, err, calls)
 			}
@@ -53,7 +51,7 @@ func TestFactoryRejectsInvalidConfigBeforeHooks(t *testing.T) {
 }
 
 func TestFactoryCreatesIndependentHandlersWithoutRemounting(t *testing.T) {
-	if err := adapter.ValidateFactory(NewFactory(), adapter.Requirements{WebSocketUpgrade: true}); err != nil {
+	if err := adapter.ValidateFactory(NewFactory(), adapter.Requirements{NetHTTPUpgrade: true}); err != nil {
 		t.Fatal(err)
 	}
 	var natives []*echo.Echo
@@ -71,7 +69,7 @@ func TestFactoryCreatesIndependentHandlersWithoutRemounting(t *testing.T) {
 	if len(natives) != 2 || natives[0] == natives[1] {
 		t.Fatalf("훅은 준비마다 한 번만 호출해야 합니다: %d", len(natives))
 	}
-	if first.httpServer == second.httpServer || first.httpServer.Handler != first.echo || second.httpServer.Handler != second.echo {
+	if first.httpServer == second.httpServer || first.httpServer.Handler != first.Handler() || second.httpServer.Handler != second.Handler() {
 		t.Fatal("각 어댑터는 해당 Echo handler를 사용하는 독립 HTTP 서버를 소유해야 합니다")
 	}
 }
@@ -97,7 +95,7 @@ func TestFactoryMountOrderAndHookSnapshot(t *testing.T) {
 	}
 	var calls int
 	var rawWriter http.ResponseWriter
-	upgrades := []adapter.UpgradeRoute{
+	upgrades := []adapter.NetHTTPUpgradeRoute{
 		{Path: "/ws/a", Handler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = io.WriteString(w, "upgrade-a") })},
 		{Path: "/ws/b", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			rawWriter = w
@@ -109,7 +107,7 @@ func TestFactoryMountOrderAndHookSnapshot(t *testing.T) {
 		})},
 	}
 	sdkOptions := optionsForHooks(hooks)
-	server := newConfiguredAdapter(t, adapter.Config{
+	server := newConfiguredAdapter(t, testConfig{
 		Options: adapter.ServerOptions{MaxBodyBytes: 1},
 		Execute: func(ctx adapter.HTTPContext) error {
 			calls++
@@ -154,12 +152,12 @@ func TestFactoryRequestScopeAndNoErrorRedelivery(t *testing.T) {
 			return func(ctx *echo.Context) error { ctx.Set("native-value", true); return next(ctx) }
 		})
 	}})
-	server := newConfiguredAdapter(t, adapter.Config{
+	server := newConfiguredAdapter(t, testConfig{
 		Execute: func(ctx adapter.HTTPContext) error {
 			if ctx.Context().Value(contextKey{}) != "carried" {
 				t.Error("원래 요청 context 값을 보존해야 합니다")
 			}
-			if ctx.Method() != "POST" || ctx.Path() != "/items" || ctx.Query("page") != "2" || ctx.Header("X-Request") != "value" {
+			if ctx.Method() != "POST" || ctx.RawPath() != "/items" || ctx.RawQuery() != "page=2" || ctx.Header("X-Request") != "value" {
 				t.Error("원래 HTTP 입력을 보존해야 합니다")
 			}
 			contexts = append(contexts, ctx)
@@ -196,12 +194,12 @@ func TestFactoryUpgradeReceivesRawWriterThroughEchoV5Wrapper(t *testing.T) {
 			}
 		})
 	}})
-	server := newConfiguredAdapter(t, adapter.Config{
+	server := newConfiguredAdapter(t, testConfig{
 		Execute: func(adapter.HTTPContext) error {
 			t.Fatal("업그레이드 경로가 Spine HTTP 실행 콜백을 호출하면 안 됩니다")
 			return nil
 		},
-		Upgrades: []adapter.UpgradeRoute{{Path: "/ws", Handler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		Upgrades: []adapter.NetHTTPUpgradeRoute{{Path: "/ws", Handler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			received = w
 			_, _ = io.WriteString(w, "raw-upgrade")
 		})}},
@@ -212,9 +210,19 @@ func TestFactoryUpgradeReceivesRawWriterThroughEchoV5Wrapper(t *testing.T) {
 	}
 }
 
-func newConfiguredAdapter(t *testing.T, config adapter.Config, options ...EchoOption) *EchoAdapter {
+func newConfiguredAdapter(t *testing.T, config any, options ...EchoOption) *EchoAdapter {
 	t.Helper()
-	server, err := NewFactory(options...).New(config)
+	var cfg adapter.Config
+	var upgrades []adapter.NetHTTPUpgradeRoute
+	switch value := config.(type) {
+	case adapter.Config:
+		cfg = value
+	case testConfig:
+		cfg, upgrades = value.contract(), value.Upgrades
+	default:
+		t.Fatalf("알 수 없는 테스트 설정: %T", config)
+	}
+	server, err := NewFactory(options...).(adapter.NetHTTPUpgradeFactory).NewWithNetHTTPUpgrades(cfg, upgrades)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -254,4 +262,14 @@ func TestFactoryRejectsNilEchoConfigurationBeforeHooks(t *testing.T) {
 	if server != nil || !errors.Is(err, adapter.ErrInvalidAdapter) || calls != 0 {
 		t.Fatalf("nil Echo 설정은 실행 전에 거부해야 합니다: server=%v err=%v calls=%d", server, err, calls)
 	}
+}
+
+type testConfig struct {
+	Options  adapter.ServerOptions
+	Execute  adapter.ExecuteFunc
+	Upgrades []adapter.NetHTTPUpgradeRoute
+}
+
+func (c testConfig) contract() adapter.Config {
+	return adapter.Config{Options: c.Options, Execute: c.Execute}
 }
