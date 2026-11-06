@@ -221,9 +221,9 @@ class CohortTests(unittest.TestCase):
         with patch.dict(os.environ, {"GITHUB_REF": "refs/heads/preview"}), patch.object(release, "verify_source_candidate", side_effect=self.verify):
             return release.complete_plan(self.github, self.policy, self.version, self.peers.__getitem__)
 
-    def test_completion_requires_all_five_exact_platform_manifests(self):
+    def test_completion_requires_all_exact_platform_manifests(self):
         plan = self.complete()
-        self.assertEqual(len(plan["platform_evidence"]), 5)
+        self.assertEqual(len(plan["platform_evidence"]), len(release.PLATFORMS))
         peer = next(iter(self.peers.values()))
         peer.tags.clear()
         with self.assertRaises(release.ReleaseError):
