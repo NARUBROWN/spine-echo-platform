@@ -1,15 +1,17 @@
 # spine-echo-platform
 
-> 이슈 #28 브랜치는 HTTP v3 계약과 공통 입력 파서로 이행 중입니다. 같은 계약으로 이행한 코어/Echo 소스를 함께 사용해야 하며, 공개 v2 조합에 소급 적용되지 않습니다. 코어 소스의 `docs/migration/http-v3.md`에서 입력 처리와 Prepare API 전환을 확인하세요.
+> 이슈 #28 브랜치는 HTTP v3 계약과 공통 입력 파서로 이행했습니다. 로컬 후보는 Echo `v0.2.0-preview.2`와 코어 `v0.7.0-preview.3`입니다. 같은 계약의 소스를 함께 사용해야 하며 공개 v2 조합에는 소급 적용되지 않습니다. 새 태그와 CLI v3 생성 지원은 아직 없으며, 코어 소스의 `docs/migration/http-v3.md`에서 입력 처리와 Prepare API 전환을 확인하세요.
 
 
 > 이 작업 소스의 대상 버전은 `v0.2.0`이며 Preview, RC, 정식 채널로 발행합니다. [릴리스 운영](RELEASING.md)을 확인하세요. 기존 정식 `v0.1.0`은 변경하지 않습니다.
 
-Spine v0.6.0용 Echo v5.4.4 HTTP 플랫폼과 편의 생성자를 제공합니다. Go 패키지 이름은 `platform`이며 Go 1.25.5 이상을 사용합니다.
+Spine HTTP v3용 Echo v5.4.4 플랫폼과 편의 생성자를 제공합니다. Go 패키지 이름은 `platform`이며 Go 1.25.5 이상을 사용합니다.
 
-플랫폼 모듈은 Spine과 Echo를 의존성으로 가져오고, Spine의 공개 `adapter` 계약을 구현하는 EchoAdapter를 제공합니다. 계약은 Spine 모듈에 포함되며 별도 계약 모듈이나 저장소를 요구하지 않습니다.
+플랫폼 모듈은 Spine과 Echo를 의존성으로 가져오고, Spine의 공개 `contract/http` 계약을 구현하는 EchoAdapter를 제공합니다. 계약은 Spine 모듈에 포함되며 별도 계약 모듈이나 저장소를 요구하지 않습니다.
 
 ## Spine CLI로 시작하기
+
+이 절과 아래 `v0.1.0` 직접 설치 예시는 기존 공개 조합을 설명합니다. 이번 HTTP v3 후보를 생성하는 CLI 지원은 후속 작업입니다.
 
 Spine `v0.6.0`부터 새 프로젝트의 공식 생성 경로는 Spine CLI의 `new`입니다. [최신 공개 CLI](https://github.com/NARUBROWN/spine-cli#권장-환경과-설치)를 설치하면, `new`가 CLI에 포함된 검증 레시피를 따라 Spine, Echo 플랫폼과 Echo의 호환 버전 조합을 구성합니다.
 

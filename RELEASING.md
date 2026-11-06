@@ -6,11 +6,13 @@
 
 | 채널 | 코어 고정 버전 | 이 모듈의 태그 |
 | --- | --- | --- |
-| Preview | v0.7.0-preview.1 | v0.2.0-preview.1 |
+| Preview | v0.7.0-preview.3 | v0.2.0-preview.2 |
 | RC | v0.7.0-rc.1 | v0.2.0-rc.1 |
 | 정식 | v0.7.0 | v0.2.0 |
 
 정확한 계획은 `.github/release-policy.json`에 고정합니다. 패키지의 기본 버전은 코어와 독립적이며 같은 채널의 코어를 사용합니다. 다음 후보의 번호는 이미 발행한 번호보다 커야 합니다.
+
+이번 HTTP v3 후보는 로컬 소스로 검증한 상태입니다. 코어와 플랫폼의 새 태그는 아직 발행하지 않았으며, 태그 발행 후 실제 공개 의존성으로 `go mod tidy`와 공개 설치 검증을 진행해야 합니다.
 
 소스 CI는 아직 없는 코어 태그 때문에 중단되지 않도록 `ci_core`의 전체 SHA를 임시 workspace로 연결합니다. 저장소의 go.mod에 replace를 추가하지 않습니다. 발행 CI와 공개 검증은 `GOWORK=off`로 실제 코어 태그를 사용하며 소스 CI를 공개 설치 증거로 대신하지 않습니다.
 
@@ -46,7 +48,7 @@ Preview 완료 후 72시간, RC 완료 후 24시간을 관찰합니다. 정식 �
 코어의 다음 채널 후보 태그를 먼저 발행한 후 전용 승격 브랜치에서 의존성을 갱신합니다.
 
 ```sh
-git switch -c promote/rc/v0.2.0-rc.1 v0.2.0-preview.1
+git switch -c promote/rc/v0.2.0-rc.1 v0.2.0-preview.2
 python3 scripts/release/pin_channel.py --channel rc --apply --tidy
 ```
 
