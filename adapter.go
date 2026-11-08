@@ -220,11 +220,19 @@ func (s *EchoAdapter) handle(c *echo.Context) error {
 	ctx := newContext(c)
 
 	if err := s.execute(ctx); err != nil {
-		c.Logger().ErrorContext(c.Request().Context(), "HTTP execution error", "error", err)
+		if !isCommittedNotFound(c) {
+			c.Logger().ErrorContext(c.Request().Context(), "HTTP execution error", "error", err)
+		}
 		// 파이프라인 내부에서 이미 응답이 작성되었으므로 Echo 기본 에러 핸들러로 중복 전달하지 않는다.
 		return nil
 	}
 	return nil
+}
+
+// 이미 렌더링된 404는 상위 native 미들웨어가 정적 파일이나 CSR 응답으로 대체할 수 있는 정상 제어 흐름입니다.
+func isCommittedNotFound(c *echo.Context) bool {
+	response, err := echo.UnwrapResponse(c.Response())
+	return err == nil && response.Committed && response.Status == http.StatusNotFound
 }
 
 // ServeHTTP는 native middleware와 업그레이드까지 포함한 요청 전체를 추적합니다.
