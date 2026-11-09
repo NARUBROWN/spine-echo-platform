@@ -37,7 +37,7 @@ func TestServeSingleUseAndListenerOwnership(t *testing.T) {
 	if err := server.Shutdown(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if err := waitLifecycleError(t, serveResult); !errors.Is(err, http.ErrServerClosed) {
+	if err := waitLifecycleError(t, serveResult); !errors.Is(err, adapter.ErrServerClosed) {
 		t.Fatalf("정상 종료의 Serve 결과가 다릅니다: %v", err)
 	}
 	if first.closeCalls.Load() != 1 {
@@ -84,7 +84,7 @@ func TestShutdownDuringServeStartup(t *testing.T) {
 	// Shutdown은 Serve의 반환도 기다리므로 리스너 종료를 먼저 관찰하고 진입을 풉니다.
 	waitLifecycleSignal(t, listener.closed)
 	unblock()
-	if err := waitLifecycleError(t, serveResult); !errors.Is(err, http.ErrServerClosed) {
+	if err := waitLifecycleError(t, serveResult); !errors.Is(err, adapter.ErrServerClosed) {
 		t.Fatalf("Serve 시작과 정상 종료의 경합 결과가 다릅니다: %v", err)
 	}
 	if err := waitLifecycleError(t, shutdownResult); err != nil {
@@ -135,7 +135,7 @@ func TestShutdownDeadlineAndConcurrentRetry(t *testing.T) {
 	if requestContext.Err() != nil {
 		t.Fatalf("HTTP Shutdown이 활성 요청 context를 강제 취소하면 안 됩니다: %v", requestContext.Err())
 	}
-	if err := waitLifecycleError(t, serveResult); !errors.Is(err, http.ErrServerClosed) {
+	if err := waitLifecycleError(t, serveResult); !errors.Is(err, adapter.ErrServerClosed) {
 		t.Fatalf("리스너 종료는 활성 요청 완료와 구분해야 합니다: %v", err)
 	}
 	select {
@@ -179,7 +179,7 @@ func TestServeFailurePreservesCauseAndClosesListener(t *testing.T) {
 	}
 }
 
-func TestShutdownDoesNotOwnExternalServer(t *testing.T) {
+func TestShutdownBlocksEntriesWithoutClosingExternalServer(t *testing.T) {
 	server := newConfiguredAdapter(t, adapter.Config{Execute: func(ctx adapter.HTTPContext) error {
 		writer := ctx.Writer()
 		return writer.WriteStatus(http.StatusNoContent)
@@ -194,8 +194,8 @@ func TestShutdownDoesNotOwnExternalServer(t *testing.T) {
 		t.Fatalf("Handler를 실행하는 외부 서버의 종료 책임은 외부에 있습니다: %v", err)
 	}
 	defer response.Body.Close()
-	if response.StatusCode != http.StatusNoContent {
-		t.Fatalf("외부 서버의 HTTP 처리를 변경하면 안 됩니다: %d", response.StatusCode)
+	if response.StatusCode != http.StatusServiceUnavailable {
+		t.Fatalf("외부 서버 연결은 유지하고 새 앱 진입은 503이어야 합니다: %d", response.StatusCode)
 	}
 }
 
