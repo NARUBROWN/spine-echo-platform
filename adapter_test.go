@@ -1,8 +1,12 @@
 package platform
 
 import (
+	"bytes"
+	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -31,6 +35,47 @@ func TestResponseWriterTracksEchoV5WrappedResponseCommit(t *testing.T) {
 		if !writer.IsCommitted() || recorder.Code != http.StatusAccepted {
 			t.Fatalf("wrapper를 거쳐도 실제 커밋 상태를 읽어야 합니다: native=%v code=%d", nativeWrite, recorder.Code)
 		}
+	}
+}
+
+func TestHandleSuppressesOnlyCommittedNotFoundExecutionLog(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		status  int
+		wantLog bool
+	}{
+		{name: "committed_not_found", status: http.StatusNotFound, wantLog: false},
+		{name: "other_client_error", status: http.StatusBadRequest, wantLog: true},
+		{name: "server_error", status: http.StatusInternalServerError, wantLog: true},
+		{name: "unrendered_error", wantLog: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var output bytes.Buffer
+			factory := NewFactory(WithEcho(func(server *echo.Echo) {
+				server.Logger = slog.New(slog.NewTextHandler(&output, nil))
+			}))
+			prepared, err := factory.New(adapter.Config{Execute: func(ctx adapter.HTTPContext) error {
+				if tt.status != 0 {
+					if err := ctx.Writer().WriteString(tt.status, http.StatusText(tt.status)); err != nil {
+						return err
+					}
+				}
+				return errors.New("execution failed")
+			}})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			recorder := httptest.NewRecorder()
+			prepared.(*EchoAdapter).Handler().ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/fallback", nil))
+			logged := strings.Contains(output.String(), "HTTP execution error")
+			if logged != tt.wantLog {
+				t.Fatalf("실행 오류 로그 경계가 다릅니다: status=%d logged=%v output=%q", tt.status, logged, output.String())
+			}
+			if tt.status != 0 && recorder.Code != tt.status {
+				t.Fatalf("응답 상태를 바꾸면 안 됩니다: got=%d want=%d", recorder.Code, tt.status)
+			}
+		})
 	}
 }
 
