@@ -43,13 +43,13 @@ func TestStarterPreparesHTTPWithNativeEcho(t *testing.T) {
 	t.Cleanup(closeApplication)
 
 	recorder := httptest.NewRecorder()
-	prepared.Handler().ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/native", nil))
+	preparedHandler(t, prepared).ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/native", nil))
 	if recorder.Code != http.StatusNoContent {
 		t.Fatalf("준비한 앱의 native 경로 응답: %d %s", recorder.Code, recorder.Body.String())
 	}
 	closeApplication()
 	recorder = httptest.NewRecorder()
-	prepared.Handler().ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/native", nil))
+	preparedHandler(t, prepared).ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/native", nil))
 	if recorder.Code != http.StatusServiceUnavailable {
 		t.Fatalf("Close 이후에는 새 요청을 거부해야 합니다: %d", recorder.Code)
 	}

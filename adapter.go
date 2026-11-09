@@ -3,6 +3,7 @@ package platform
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -12,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	adapter "github.com/NARUBROWN/spine/adapter"
+	adapter "github.com/NARUBROWN/spine/contract/http"
 	"github.com/labstack/echo/v5"
 )
 
@@ -51,9 +52,16 @@ type EchoAdapter struct {
 	execute      adapter.ExecuteFunc
 	httpServer   *http.Server
 	maxBodyBytes int64
+	serveOptions adapter.ServeOptions
 
-	lifecycleMu sync.Mutex
-	state       lifecycleState
+	lifecycleMu  sync.Mutex
+	state        lifecycleState
+	handler      http.Handler
+	active       int
+	drained      chan struct{}
+	shutdownDone chan struct{}
+	shutdownOnce sync.Once
+	shutdownErr  error
 }
 
 var _ adapter.HTTPAdapter = (*EchoAdapter)(nil)
@@ -71,12 +79,16 @@ func newAdapter(execute adapter.ExecuteFunc, opts adapter.ServerOptions) *EchoAd
 		MaxHeaderBytes:    normalized.MaxHeaderBytes,
 	}
 
-	return &EchoAdapter{
+	server := &EchoAdapter{
 		echo:         e,
 		execute:      execute,
 		httpServer:   httpServer,
 		maxBodyBytes: normalized.MaxBodyBytes,
+		drained:      make(chan struct{}), shutdownDone: make(chan struct{}),
 	}
+	server.handler = server
+	server.httpServer.Handler = server.handler
+	return server
 }
 
 func normalizeHTTPOptions(opts adapter.ServerOptions) normalizedHTTPOptions {
@@ -114,7 +126,8 @@ func normalizeHTTPOptions(opts adapter.ServerOptions) normalizedHTTPOptions {
 
 func newEcho(opts normalizedHTTPOptions) *echo.Echo {
 	e := echo.NewWithConfig(echo.Config{
-		Logger: slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError})),
+		Logger:         slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError})),
+		JSONSerializer: jsonSerializer{},
 	})
 	if !opts.DisableRecover {
 		e.Use(simpleRecover())
@@ -144,36 +157,57 @@ func (s *EchoAdapter) Handler() http.Handler {
 	if s == nil || s.echo == nil {
 		return nil
 	}
-	return s.echo
+	return s.handler
 }
 
 // Serve는 리스너를 소유하고 인스턴스당 한 번 서버를 실행합니다.
 // 실제 서버 실행 중에는 상태 잠금을 유지하지 않습니다.
-func (s *EchoAdapter) Serve(listener net.Listener) error {
+func (s *EchoAdapter) Serve(listener net.Listener, options ...adapter.ServeOption) (serveErr error) {
 	if isNil(listener) {
 		return fmt.Errorf("%w: listener is nil", adapter.ErrInvalidState)
 	}
+	owned := &ownedListener{Listener: listener}
+	defer func() {
+		if closeErr := owned.Close(); closeErr != nil {
+			serveErr = errors.Join(serveErr, closeErr)
+		}
+	}()
 	if s == nil || s.httpServer == nil {
-		return errors.Join(fmt.Errorf("%w: EchoAdapter is not initialized", adapter.ErrInvalidAdapter), listener.Close())
+		return fmt.Errorf("%w: EchoAdapter is not initialized", adapter.ErrInvalidAdapter)
+	}
+	resolved, err := s.serveOptions.Resolve((factory{}).Capabilities(), options...)
+	if err != nil {
+		return err
 	}
 
 	s.lifecycleMu.Lock()
 	if s.state != stateReady {
 		s.lifecycleMu.Unlock()
-		return errors.Join(fmt.Errorf("%w: Serve requires a new adapter", adapter.ErrInvalidState), listener.Close())
+		return fmt.Errorf("%w: Serve requires a new adapter", adapter.ErrInvalidState)
 	}
 	s.state = stateServing
 	s.lifecycleMu.Unlock()
-	defer func() {
-		s.lifecycleMu.Lock()
-		if s.state != stateStopped {
-			s.state = stateStopping
-		}
-		s.lifecycleMu.Unlock()
-	}()
 
-	// http.Server.Serve는 정상 종료와 오류를 포함한 모든 반환 경로에서 리스너를 닫습니다.
-	return s.httpServer.Serve(listener)
+	var native net.Listener = owned
+	if resolved.TLS != nil {
+		native = tls.NewListener(owned, resolved.TLS)
+	}
+	err = s.httpServer.Serve(native)
+	if errors.Is(err, http.ErrServerClosed) {
+		return adapter.ErrServerClosed
+	}
+	return err
+}
+
+type ownedListener struct {
+	net.Listener
+	once sync.Once
+	err  error
+}
+
+func (l *ownedListener) Close() error {
+	l.once.Do(func() { l.err = l.Listener.Close() })
+	return l.err
 }
 
 func (s *EchoAdapter) handle(c *echo.Context) error {
@@ -186,14 +220,58 @@ func (s *EchoAdapter) handle(c *echo.Context) error {
 	ctx := newContext(c)
 
 	if err := s.execute(ctx); err != nil {
-		c.Logger().ErrorContext(c.Request().Context(), "HTTP execution error", "error", err)
+		if !isCommittedNotFound(c) {
+			c.Logger().ErrorContext(c.Request().Context(), "HTTP execution error", "error", err)
+		}
 		// 파이프라인 내부에서 이미 응답이 작성되었으므로 Echo 기본 에러 핸들러로 중복 전달하지 않는다.
 		return nil
 	}
 	return nil
 }
 
-// Shutdown은 HTTP 종료를 기다립니다. 시간 초과 뒤 새 context로 다시 기다릴 수 있습니다.
+// 이미 렌더링된 404는 상위 native 미들웨어가 정적 파일이나 CSR 응답으로 대체할 수 있는 정상 제어 흐름입니다.
+func isCommittedNotFound(c *echo.Context) bool {
+	response, err := echo.UnwrapResponse(c.Response())
+	return err == nil && response.Committed && response.Status == http.StatusNotFound
+}
+
+// ServeHTTP는 native middleware와 업그레이드까지 포함한 요청 전체를 추적합니다.
+func (s *EchoAdapter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	s.lifecycleMu.Lock()
+	if s.state >= stateStopping {
+		s.lifecycleMu.Unlock()
+		http.Error(w, "application is closing", http.StatusServiceUnavailable)
+		return
+	}
+	s.active++
+	s.lifecycleMu.Unlock()
+	ctx, cancel := context.WithCancel(r.Context())
+	defer func() {
+		cancel()
+		s.lifecycleMu.Lock()
+		defer s.lifecycleMu.Unlock()
+		s.active--
+		if s.state >= stateStopping && s.active == 0 {
+			close(s.drained)
+		}
+	}()
+	s.echo.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// StopAccepting은 진행 요청을 보존하고 새 native 진입을 동기 차단합니다.
+func (s *EchoAdapter) StopAccepting() {
+	s.lifecycleMu.Lock()
+	defer s.lifecycleMu.Unlock()
+	if s.state >= stateStopping {
+		return
+	}
+	s.state = stateStopping
+	if s.active == 0 {
+		close(s.drained)
+	}
+}
+
+// Shutdown의 context는 대기만 제한합니다. 정리는 백그라운드에서 계속합니다.
 func (s *EchoAdapter) Shutdown(ctx context.Context) error {
 	if isNil(ctx) {
 		return fmt.Errorf("%w: shutdown context is nil", adapter.ErrInvalidState)
@@ -201,19 +279,26 @@ func (s *EchoAdapter) Shutdown(ctx context.Context) error {
 	if s == nil || s.httpServer == nil {
 		return fmt.Errorf("%w: EchoAdapter is not initialized", adapter.ErrInvalidAdapter)
 	}
-	s.lifecycleMu.Lock()
-	if s.state == stateStopped {
-		s.lifecycleMu.Unlock()
-		return nil
+	s.StopAccepting()
+	s.shutdownOnce.Do(func() {
+		go func() {
+			s.shutdownErr = s.httpServer.Shutdown(context.Background())
+			<-s.drained
+			s.lifecycleMu.Lock()
+			s.state = stateStopped
+			s.lifecycleMu.Unlock()
+			close(s.shutdownDone)
+		}()
+	})
+	select {
+	case <-s.shutdownDone:
+		return s.shutdownErr
+	default:
 	}
-	s.state = stateStopping
-	s.lifecycleMu.Unlock()
-
-	if err := s.httpServer.Shutdown(ctx); err != nil {
-		return err
+	select {
+	case <-s.shutdownDone:
+		return s.shutdownErr
+	case <-ctx.Done():
+		return ctx.Err()
 	}
-	s.lifecycleMu.Lock()
-	s.state = stateStopped
-	s.lifecycleMu.Unlock()
-	return nil
 }
