@@ -1,24 +1,30 @@
 # spine-echo-platform
 
-> HTTP 계약 `spine.http-adapter/v3`와 공통 입력 파서를 사용합니다. 이 소스의 Preview 조합은 Echo `v0.2.0-preview.3`와 코어 `v0.7.0-preview.4`입니다. HTTP v2 조합에는 소급 적용되지 않습니다. CLI `v0.4.3-preview.4`부터 Echo와 net/http 생성 및 업데이트를 지원합니다. 코어의 [HTTP v3 전환 안내](https://github.com/NARUBROWN/spine/blob/preview/docs/migration/http-v3.md)를 참고하세요.
-
-
-> 이 작업 소스의 대상 버전은 `v0.2.0`이며 Preview, RC, 정식 채널로 발행합니다. [릴리스 운영](RELEASING.md)을 확인하세요. 기존 정식 `v0.1.0`은 변경하지 않습니다.
-
 Spine HTTP v3용 Echo v5.4.4 플랫폼과 편의 생성자를 제공합니다. Go 패키지 이름은 `platform`이며 Go 1.25.5 이상을 사용합니다.
+
+## Stable 설치
+
+일반 개발과 운영에 사용하는 정식 릴리스 채널입니다. 공개 태그는 [`v0.2.0`](https://github.com/NARUBROWN/spine-echo-platform/tree/v0.2.0)입니다. 이 태그의 `go.mod`는 Spine `v0.7.0-preview.4`와 Go 1.25.5 이상을 지정합니다.
+
+```sh
+go get github.com/NARUBROWN/spine-echo-platform@v0.2.0
+```
+
+다른 채널은 [Preview](https://github.com/NARUBROWN/spine-echo-platform/tree/preview) | [RC](https://github.com/NARUBROWN/spine-echo-platform/tree/rc)에서 확인하세요.
+
 
 플랫폼 모듈은 Spine과 Echo를 의존성으로 가져오고, Spine의 공개 `contract/http` 계약을 구현하는 EchoAdapter를 제공합니다. 계약은 Spine 모듈에 포함되며 별도 계약 모듈이나 저장소를 요구하지 않습니다.
 
 ## Spine CLI로 시작하기
 
-이 절과 아래 `v0.1.0` 직접 설치 예시는 기존 공개 조합을 설명합니다. 이번 HTTP v3 후보를 생성하는 CLI 지원은 후속 작업입니다.
+CLI로 프로젝트를 생성한 뒤 `go.mod`에서 선택된 플랫폼 버전을 확인하세요. 기존 앱에서 이 저장소의 특정 태그를 선택하려면 아래 직접 설치 명령을 사용하세요.
 
 Spine `v0.6.0`부터 새 프로젝트의 공식 생성 경로는 Spine CLI의 `new`입니다. [최신 공개 CLI](https://github.com/NARUBROWN/spine-cli#권장-환경과-설치)를 설치하면, `new`가 CLI에 포함된 검증 레시피를 따라 Spine, Echo 플랫폼과 Echo의 호환 버전 조합을 구성합니다.
 
 ```sh
-go install github.com/NARUBROWN/spine-cli/cmd/spine@latest
+go install github.com/NARUBROWN/spine-cli/cmd/spine@v0.4.3
 spine version
-spine new todo-api --module github.com/acme/todo-api
+spine new todo-api --module github.com/acme/todo-api --channel main
 cd todo-api
 spine dev
 ```
@@ -32,7 +38,7 @@ spine dev
 기존 Go 모듈에 수동으로 연결할 때 플랫폼 의존성을 추가합니다.
 
 ```sh
-go get github.com/NARUBROWN/spine-echo-platform@v0.1.0
+go get github.com/NARUBROWN/spine-echo-platform@v0.2.0
 ```
 
 ```go
@@ -103,7 +109,7 @@ app := platform.New(platform.WithEcho(func(e *echo.Echo) {
 
 플랫폼은 v5의 HTTP 상태 코드 인터페이스를 통해 입력 오류의 상태와 원인을 보존합니다. WS 업그레이드에는 원래 HTTP writer를 전달합니다. 서버 실행과 종료는 플랫폼이 소유한 `http.Server`가 처리합니다.
 
-## 개발 브랜치의 입력 바인딩
+## HTTP v3 입력 바인딩
 
 Host 조회는 Go의 `Request.Host`를 별도로 읽습니다. `Header("Host")`와 `Headers()["Host"]`는 같은 요청 값을 제공하며 대소문자가 다른 Host 이름도 같은 값으로 처리합니다. 포트는 보존하고 `X-Forwarded-Host`로 대체하지 않습니다. 조회 맵을 변경해도 원래 요청 헤더는 변경되지 않습니다.
 
@@ -113,7 +119,7 @@ v3의 필수 `RawQuery`는 `Request.URL.RawQuery`를 디코딩하지 않고 코�
 
 Spine DTO 입력은 Echo Binder와 JSONSerializer를 호출하지 않습니다. `WithEcho`의 Binder 교체는 native Echo 경로에서 사용하고, 응답 JSONSerializer는 기존 Echo 출력 경로에 적용합니다. 요청 크기 제한과 HTTP 오류 변환은 유지합니다.
 
-이 변경은 공개된 `v0.1.0`에 포함되지 않습니다. `pkg/jsonx`를 포함한 Spine 개발 브랜치와 로컬 workspace에서 함께 검증해야 하며, 공개 배포 전에 해당 Spine 버전으로 의존성을 갱신해야 합니다.
+이 입력 방식은 HTTP v3를 사용하는 `v0.2.0`의 예제입니다. 기존 `v0.1.0` 사용자는 [HTTP v3 전환 안내](https://github.com/NARUBROWN/spine/blob/v0.7.1/docs/migration/http-v3.md)를 참고하세요.
 
 ## 리스너 없이 앱 준비
 
