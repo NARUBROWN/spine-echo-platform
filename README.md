@@ -7,8 +7,10 @@ Spine HTTP v3용 Echo v5.4.4 플랫폼과 편의 생성자를 제공합니다. G
 개발 중인 기능을 시험하고 호환성 문제를 확인하는 채널입니다. 공개 태그는 [`v0.2.0-preview.5`](https://github.com/NARUBROWN/spine-echo-platform/tree/v0.2.0-preview.5)입니다. 이 태그의 `go.mod`는 Spine `v0.7.0-preview.4`와 Go 1.25.5 이상을 지정합니다.
 
 ```sh
-go get github.com/NARUBROWN/spine-echo-platform@v0.2.0-preview.5-preview.5
+go get github.com/NARUBROWN/spine-echo-platform@v0.2.0-preview.5
 ```
+
+다음 버전인 `v0.2.1`의 검증 범위는 [전환 안내](docs/migration/v0.2.1.md)를 참고하세요.
 
 다른 채널은 [RC](https://github.com/NARUBROWN/spine-echo-platform/tree/rc) | [Stable](https://github.com/NARUBROWN/spine-echo-platform/tree/main)에서 확인하세요.
 
