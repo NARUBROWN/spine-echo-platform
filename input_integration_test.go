@@ -2,6 +2,7 @@ package platform_test
 
 import (
 	"context"
+	input "github.com/NARUBROWN/spine/pkg/input"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -30,15 +31,15 @@ type requestHeaders struct {
 }
 type strictController struct{ calls atomic.Int32 }
 
-func (c *strictController) Body(body *strictBody) httpx.Response[strictBody] {
+func (c *strictController) Body(body input.Body[strictBody]) httpx.Response[strictBody] {
 	c.calls.Add(1)
 	return httpx.Response[strictBody]{Body: *body}
 }
-func (c *strictController) Required(body *requiredBody) httpx.Response[requiredBody] {
+func (c *strictController) Required(body input.Body[requiredBody]) httpx.Response[requiredBody] {
 	c.calls.Add(1)
 	return httpx.Response[requiredBody]{Body: *body}
 }
-func (c *strictController) Host(headers *requestHeaders) httpx.Response[string] {
+func (c *strictController) Host(headers input.Header[requestHeaders]) httpx.Response[string] {
 	c.calls.Add(1)
 	return httpx.Response[string]{Body: headers.Host}
 }

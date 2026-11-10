@@ -2,29 +2,31 @@
 
 Spine HTTP v3용 Echo v5.4.4 플랫폼과 편의 생성자를 제공합니다. Go 패키지 이름은 `platform`이며 Go 1.25.5 이상을 사용합니다.
 
-## RC 설치
+## Preview 설치
 
-정식 릴리스 전에 기존 앱과의 호환성을 확인하는 채널입니다. 공개 태그는 [`v0.2.0-rc.1`](https://github.com/NARUBROWN/spine-echo-platform/tree/v0.2.0-rc.1)입니다. 이 태그의 `go.mod`는 Spine `v0.7.0-preview.4`와 Go 1.25.5 이상을 지정합니다.
+개발 중인 기능을 시험하고 호환성 문제를 확인하는 채널입니다. 공개 태그는 [`v0.2.0-preview.5`](https://github.com/NARUBROWN/spine-echo-platform/tree/v0.2.0-preview.5)입니다. 이 태그의 `go.mod`는 Spine `v0.7.0-preview.4`와 Go 1.25.5 이상을 지정합니다.
 
 ```sh
-go get github.com/NARUBROWN/spine-echo-platform@v0.2.0-rc.1-rc.1
+go get github.com/NARUBROWN/spine-echo-platform@v0.2.0-preview.5
 ```
 
-다른 채널은 [Preview](https://github.com/NARUBROWN/spine-echo-platform/tree/preview) | [Stable](https://github.com/NARUBROWN/spine-echo-platform/tree/main)에서 확인하세요.
+다음 버전인 `v0.2.1`의 검증 범위는 [전환 안내](docs/migration/v0.2.1.md)를 참고하세요.
+
+다른 채널은 [RC](https://github.com/NARUBROWN/spine-echo-platform/tree/rc) | [Stable](https://github.com/NARUBROWN/spine-echo-platform/tree/main)에서 확인하세요.
 
 
 플랫폼 모듈은 Spine과 Echo를 의존성으로 가져오고, Spine의 공개 `contract/http` 계약을 구현하는 EchoAdapter를 제공합니다. 계약은 Spine 모듈에 포함되며 별도 계약 모듈이나 저장소를 요구하지 않습니다.
 
 ## Spine CLI로 시작하기
 
-`--channel rc`는 공개 RC와 정식 태그 중 최신 버전을 선택합니다. CLI로 프로젝트를 생성한 뒤 `go.mod`에서 선택된 플랫폼 버전을 확인하세요. 기존 앱에서 이 저장소의 특정 태그를 선택하려면 아래 직접 설치 명령을 사용하세요.
+CLI로 프로젝트를 생성한 뒤 `go.mod`에서 선택된 플랫폼 버전을 확인하세요. 기존 앱에서 이 저장소의 특정 태그를 선택하려면 아래 직접 설치 명령을 사용하세요.
 
 Spine `v0.6.0`부터 새 프로젝트의 공식 생성 경로는 Spine CLI의 `new`입니다. [최신 공개 CLI](https://github.com/NARUBROWN/spine-cli#권장-환경과-설치)를 설치하면, `new`가 CLI에 포함된 검증 레시피를 따라 Spine, Echo 플랫폼과 Echo의 호환 버전 조합을 구성합니다.
 
 ```sh
-go install github.com/NARUBROWN/spine-cli/cmd/spine@v0.4.3-rc.3
+go install github.com/NARUBROWN/spine-cli/cmd/spine@v0.4.4-preview.2
 spine version
-spine new todo-api --module github.com/acme/todo-api --channel rc
+spine new todo-api --module github.com/acme/todo-api --channel preview
 cd todo-api
 spine dev
 ```
@@ -38,7 +40,7 @@ spine dev
 기존 Go 모듈에 수동으로 연결할 때 플랫폼 의존성을 추가합니다.
 
 ```sh
-go get github.com/NARUBROWN/spine-echo-platform@v0.2.0-rc.1
+go get github.com/NARUBROWN/spine-echo-platform@v0.2.0-preview.5
 ```
 
 ```go
