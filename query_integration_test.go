@@ -3,6 +3,7 @@ package platform_test
 import (
 	"context"
 	"encoding/json"
+	input "github.com/NARUBROWN/spine/pkg/input"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -25,9 +26,9 @@ type queryInputs struct {
 }
 type queryController struct{ calls atomic.Int32 }
 
-func (c *queryController) List(input *queryInputs) httpx.Response[queryInputs] {
+func (c *queryController) List(dto input.Query[queryInputs]) httpx.Response[queryInputs] {
 	c.calls.Add(1)
-	return httpx.Response[queryInputs]{Body: *input}
+	return httpx.Response[queryInputs]{Body: *dto}
 }
 func (c *queryController) Page(input query.Pagination) httpx.Response[query.Pagination] {
 	c.calls.Add(1)
