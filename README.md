@@ -1,27 +1,28 @@
+English | [Korean](README.ko.md)
+
 # spine-echo-platform
 
-Spine HTTP v3용 Echo v5.4.4 플랫폼과 편의 생성자를 제공합니다. Go 패키지 이름은 `platform`이며 Go 1.25.5 이상을 사용합니다.
+An Echo v5.4.4 platform and convenience constructors for Spine HTTP v3. The Go package name is `platform`; Go 1.25.5 or later is required.
 
-## Preview 설치
+## Preview installation
 
-개발 중인 기능을 시험하고 호환성 문제를 확인하는 채널입니다. 공개 태그는 [`v0.2.0-preview.5`](https://github.com/NARUBROWN/spine-echo-platform/tree/v0.2.0-preview.5)입니다. 이 태그의 `go.mod`는 Spine `v0.7.0-preview.4`와 Go 1.25.5 이상을 지정합니다.
+Use this channel to try features under development and check compatibility. The published tag is [`v0.2.0-preview.5`](https://github.com/NARUBROWN/spine-echo-platform/tree/v0.2.0-preview.5). Its `go.mod` specifies Spine `v0.7.0-preview.4` and Go 1.25.5 or later.
 
 ```sh
 go get github.com/NARUBROWN/spine-echo-platform@v0.2.0-preview.5
 ```
 
-다음 버전인 `v0.2.1`의 검증 범위는 [전환 안내](docs/migration/v0.2.1.md)를 참고하세요.
+See the [migration guide](docs/migration/v0.2.1.md) for the verification scope of the next version, `v0.2.1`.
 
-다른 채널은 [RC](https://github.com/NARUBROWN/spine-echo-platform/tree/rc) | [Stable](https://github.com/NARUBROWN/spine-echo-platform/tree/main)에서 확인하세요.
+Other channels: [RC](https://github.com/NARUBROWN/spine-echo-platform/tree/rc) | [Stable](https://github.com/NARUBROWN/spine-echo-platform/tree/main).
 
+This module depends on Spine and Echo and provides an EchoAdapter implementing Spine's public `contract/http` contract. Contracts are included in the Spine module; no separate contract module or repository is needed.
 
-플랫폼 모듈은 Spine과 Echo를 의존성으로 가져오고, Spine의 공개 `contract/http` 계약을 구현하는 EchoAdapter를 제공합니다. 계약은 Spine 모듈에 포함되며 별도 계약 모듈이나 저장소를 요구하지 않습니다.
+## Start with Spine CLI
 
-## Spine CLI로 시작하기
+Generate a project with the CLI, then check `go.mod` for the selected platform version. To select a particular tag in an existing application, use the direct installation commands below.
 
-CLI로 프로젝트를 생성한 뒤 `go.mod`에서 선택된 플랫폼 버전을 확인하세요. 기존 앱에서 이 저장소의 특정 태그를 선택하려면 아래 직접 설치 명령을 사용하세요.
-
-Spine `v0.6.0`부터 새 프로젝트의 공식 생성 경로는 Spine CLI의 `new`입니다. [최신 공개 CLI](https://github.com/NARUBROWN/spine-cli#권장-환경과-설치)를 설치하면, `new`가 CLI에 포함된 검증 레시피를 따라 Spine, Echo 플랫폼과 Echo의 호환 버전 조합을 구성합니다.
+Since Spine `v0.6.0`, the official way to create a project is Spine CLI's `new` command. Install the [latest public CLI](https://github.com/NARUBROWN/spine-cli#quick-start). The embedded verification recipe selects a compatible combination of Spine, the Echo platform, and Echo.
 
 ```sh
 go install github.com/NARUBROWN/spine-cli/cmd/spine@v0.4.4-preview.2
@@ -31,13 +32,13 @@ cd todo-api
 spine dev
 ```
 
-다른 터미널에서 `curl http://localhost:8080/health`로 `200 OK`와 `{"status":"ok"}` 응답을 확인합니다. 선택된 의존성 버전은 생성된 `go.mod`에서 확인합니다.
+In another terminal, run `curl http://localhost:8080/health` and check for `200 OK` with `{"status":"ok"}`. See the generated `go.mod` for selected dependency versions.
 
-`new`는 기본으로 플랫폼 연결, 의존성 설치, 정적 계약 검사와 빌드를 완료한 뒤 프로젝트를 생성합니다. 서버는 `spine dev`로 시작합니다. `--skip-install`로 파일만 생성했다면 `go mod tidy`를 별도로 실행하세요.
+By default, `new` wires the platform, installs dependencies, checks static contracts, and builds the project. Start the server with `spine dev`. If you used `--skip-install` to generate files only, run `go mod tidy` separately.
 
-## 기존 앱에 직접 플랫폼 연결
+## Connect the platform to an existing application
 
-기존 Go 모듈에 수동으로 연결할 때 플랫폼 의존성을 추가합니다.
+Add the platform dependency to your existing Go module.
 
 ```sh
 go get github.com/NARUBROWN/spine-echo-platform@v0.2.0-preview.5
@@ -59,15 +60,15 @@ func main() {
 }
 ```
 
-`platform.New()`는 `spine.New(platform.Option())`와 같습니다. 직접 조립할 때는 `spine.WithHTTPAdapter(factory)`를 사용할 수 있습니다. 커널의 spine.New()는 HTTP 플랫폼을 기본 선택하지 않습니다.
+`platform.New()` is equivalent to `spine.New(platform.Option())`. For manual composition, use `spine.WithHTTPAdapter(factory)`. The kernel's `spine.New()` does not select an HTTP platform by default.
 
-NewFactory는 `github.com/NARUBROWN/spine/contract/http.Factory`를 제공합니다. 구성 시 fallback, WS GET 경로, native 훅 순으로 마운트합니다. 플랫폼은 원시 요청 입력, 실제 응답 출력과 HTTP 서버 종료를 처리합니다. DTO 바인딩, multipart 파싱, 응답 staging과 WS 메시지 엔진은 커널이 담당합니다.
+NewFactory provides `github.com/NARUBROWN/spine/contract/http.Factory`. Preparation mounts the fallback, WebSocket GET routes, and native hooks in that order. The platform handles raw request input, response output, and HTTP server shutdown. The kernel handles DTO binding, multipart parsing, response staging, and the WebSocket message engine.
 
-`WithEcho`는 `github.com/labstack/echo/v5`의 `*echo.Echo`를 받는 typed 플랫폼 옵션입니다. native 경로는 Spine의 HTTP 인터셉터, 본문 제한과 staging을 거치지 않습니다. native store와 Spine 요청 store는 별개이므로 공유 요청 값은 표준 context를 사용합니다.
+`WithEcho` is a typed platform option receiving `*echo.Echo` from `github.com/labstack/echo/v5`. Native routes bypass Spine's HTTP interceptors, body limits, and staging. The native store and Spine request store are separate; use the standard context for shared request values.
 
-## TLS 실행
+## TLS
 
-현재 v3 개발 소스에서는 `boot.HTTPOptions.TLS`로 관리 서버의 TLS를 설정합니다. `crypto/tls`로 인증서를 먼저 읽습니다.
+In the current v3 development source, configure the managed server's TLS with `boot.HTTPOptions.TLS`. Load certificates with `crypto/tls` first.
 
 ```go
 certificate, err := tls.LoadX509KeyPair("server.crt", "server.key")
@@ -82,13 +83,13 @@ return app.RunContext(ctx, boot.Options{
 })
 ```
 
-TLS가 nil이면 평문 HTTP를 사용합니다. 주소를 생략하면 TLS는 `:https`, 평문은 `:http`입니다. Prepare는 TLS 지원과 정적 인증서를 native 훅 실행 전에 검사합니다. 인증서 선택 콜백은 실제 연결 때 호출합니다. 설정과 인증서 바이트는 복사하며 개인 키 객체와 콜백의 안전한 동시 사용은 호출자가 보장합니다.
+A nil TLS configuration uses plaintext HTTP. Without an explicit address, TLS uses `:https` and plaintext uses `:http`. Prepare checks TLS support and static certificates before native hooks run. Certificate selection callbacks run during actual connections. Configuration and certificate bytes are copied; callers must ensure private key objects and callbacks support concurrent use.
 
-준비한 어댑터의 `Serve(listener)`는 같은 설정을 사용합니다. 실행 시 `httpcontract.WithTLS(config)`를 추가하면 기본값을 교체하며 마지막 옵션이 우선합니다. `httpcontract`는 `github.com/NARUBROWN/spine/contract/http`의 import 별칭입니다. `WithTLS(nil)`과 nil 옵션은 오류이며 공개 `ServeTLS`는 추가하지 않습니다. 외부 서버에 handler만 연결한 경우 TLS는 외부 서버 소유입니다. HTTP 버전 선택과 ALPN 정책은 이번 변경에 포함하지 않습니다.
+The prepared adapter's `Serve(listener)` uses the same configuration. Passing `httpcontract.WithTLS(config)` overrides the default at serving time; the last option wins. `httpcontract` is an import alias for `github.com/NARUBROWN/spine/contract/http`. `WithTLS(nil)` and nil options return errors; there is no additional public `ServeTLS`. When attaching only a handler to an external server, that server owns TLS. HTTP version selection and ALPN policy are outside this change.
 
-## Native Echo v5 확장
+## Native Echo v5 extensions
 
-v0.1.0은 Spine의 HTTP adapter v2 계약을 사용합니다. 생성자, 컨트롤러 등록 API는 유지합니다. native Echo 확장 코드는 v5 import와 포인터 Context를 사용합니다.
+v0.1.0 uses Spine's HTTP adapter v2 contract. Constructor and controller registration APIs remain unchanged. Native Echo extensions use the v5 import and pointer Context.
 
 ```go
 import "github.com/labstack/echo/v5"
@@ -100,38 +101,38 @@ app := platform.New(platform.WithEcho(func(e *echo.Echo) {
 }))
 ```
 
-- handler와 middleware는 `*echo.Context`를 받습니다.
-- `HTTPErrorHandler`는 `func(ctx *echo.Context, err error)` 순서입니다.
-- logger는 표준 `log/slog`를 사용합니다.
-- 경로 인자는 `PathValues()`로 조회합니다. `Response()`는 `http.ResponseWriter`를 반환하며 Echo의 상태가 필요하면 `echo.UnwrapResponse`를 사용합니다. native middleware의 응답 wrapper도 `Unwrap() http.ResponseWriter`를 제공해야 합니다.
+- Handlers and middleware receive `*echo.Context`.
+- `HTTPErrorHandler` has the argument order `func(ctx *echo.Context, err error)`.
+- Logging uses the standard `log/slog` package.
+- Read route arguments with `PathValues()`. `Response()` returns `http.ResponseWriter`; use `echo.UnwrapResponse` for Echo response state. Native middleware response wrappers must also provide `Unwrap() http.ResponseWriter`.
 
-`NewFactory(options...)`, `Option(options...)`와 `New(options...)`는 같은 Echo 옵션을 받습니다. 옵션 등록, 기능 검사는 함수를 실행하지 않으며, 각 준비에서 fallback, WS 경로를 등록한 뒤 순서대로 한 번 실행합니다. nil 함수는 준비 단계에서 거부합니다.
+`NewFactory(options...)`, `Option(options...)`, and `New(options...)` accept the same Echo options. Registration and capability checks do not execute these functions. Each preparation runs them once, in order, after registering fallback and WebSocket routes. Nil functions are rejected during preparation.
 
-응답 `WriteJSON`은 core에서 직렬화한 `json.RawMessage`만 받습니다. Echo의 JSON 출력 경로를 유지하므로 개행, pretty 출력과 사용자 JSONSerializer도 적용됩니다. 사용자 serializer에는 원래 DTO 대신 RawMessage가 전달되므로 이 타입을 처리해야 합니다. v1의 `Config.NativeHooks`와 `App.Transport`는 사용하지 않습니다.
+Response `WriteJSON` accepts only a `json.RawMessage` serialized by the core. It retains Echo's JSON output path, including newlines, pretty printing, and custom JSONSerializer behavior. Custom serializers receive RawMessage instead of the original DTO and must support that type. The v1 `Config.NativeHooks` and `App.Transport` APIs are not used.
 
-플랫폼은 v5의 HTTP 상태 코드 인터페이스를 통해 입력 오류의 상태와 원인을 보존합니다. WS 업그레이드에는 원래 HTTP writer를 전달합니다. 서버 실행과 종료는 플랫폼이 소유한 `http.Server`가 처리합니다.
+The platform preserves input error status and causes through Echo v5's HTTP status code interface. WebSocket upgrades receive the original HTTP writer. An `http.Server` owned by the platform handles serving and shutdown.
 
-## HTTP v3 입력 바인딩
+## HTTP v3 input binding
 
-Host 조회는 Go의 `Request.Host`를 별도로 읽습니다. `Header("Host")`와 `Headers()["Host"]`는 같은 요청 값을 제공하며 대소문자가 다른 Host 이름도 같은 값으로 처리합니다. 포트는 보존하고 `X-Forwarded-Host`로 대체하지 않습니다. 조회 맵을 변경해도 원래 요청 헤더는 변경되지 않습니다.
+Host lookup reads Go's `Request.Host` separately. `Header("Host")` and `Headers()["Host"]` expose the same request value; case variants of Host behave identically. The port is preserved, and `X-Forwarded-Host` does not replace it. Modifying the returned map does not modify the original request headers.
 
-v3의 필수 `RawQuery`는 `Request.URL.RawQuery`를 디코딩하지 않고 코어로 전달합니다. 코어의 쿼리 슬라이스는 반복 키와 쉼표 구분을 함께 지원합니다. `tags=a,b`는 두 원소, `tags=a%2Cb`는 쉼표를 포함한 한 원소로 바인딩하며 `tags=a,%20b`의 두 번째 원소는 앞 공백을 유지합니다. 일반 Query와 Queries 조회도 코어가 URL 디코딩해 제공합니다.
+The required v3 `RawQuery` passes `Request.URL.RawQuery` to the core without decoding. Core query slices support repeated keys and comma separation. `tags=a,b` binds two elements; `tags=a%2Cb` binds one element containing a comma. In `tags=a,%20b`, the second element retains its leading space. The core also URL-decodes ordinary Query and Queries lookups.
 
-기본 JSON 디코더는 Spine의 `pkg/jsonx.Unmarshal`을 사용합니다. `int`, `bool`, `string`과 일반 구조체, 배열에 보낸 명시적 null은 400 입력 오류로 거부합니다. 중첩 필드와 컬렉션 원소에도 같은 규칙을 적용합니다. 필드 누락, 포인터와 map, slice의 null은 보존하고 필수 여부는 validator가 판단합니다. 사용자 정의 `json.Unmarshaler`는 자신의 null 처리를 유지합니다.
+The default JSON decoder uses Spine's `pkg/jsonx.Unmarshal`. Explicit null for `int`, `bool`, `string`, ordinary structs, and arrays is rejected with a 400 input error, including nested fields and collection elements. Missing fields and null pointers, maps, and slices are preserved; the validator decides whether they are required. Custom `json.Unmarshaler` implementations retain their own null handling.
 
-Spine DTO 입력은 Echo Binder와 JSONSerializer를 호출하지 않습니다. `WithEcho`의 Binder 교체는 native Echo 경로에서 사용하고, 응답 JSONSerializer는 기존 Echo 출력 경로에 적용합니다. 요청 크기 제한과 HTTP 오류 변환은 유지합니다.
+Spine DTO input does not call Echo Binder or JSONSerializer. Replacing Binder through `WithEcho` affects native Echo routes; response JSONSerializer remains part of Echo's output path. Request size limits and HTTP error conversion remain in effect.
 
-이 입력 방식은 HTTP v3를 사용하는 `v0.2.0`의 예제입니다. 기존 `v0.1.0` 사용자는 [HTTP v3 전환 안내](https://github.com/NARUBROWN/spine/blob/v0.7.1/docs/migration/http-v3.md)를 참고하세요.
+These examples describe `v0.2.0`, which uses HTTP v3. Existing `v0.1.0` users should read the [HTTP v3 migration guide](https://github.com/NARUBROWN/spine/blob/v0.7.1/docs/migration/http-v3.md).
 
-## 리스너 없이 앱 준비
+## Prepare without opening a listener
 
-`platform.New()`가 반환하는 `spine.App`은 `app.Prepare(ctx, options)`를 직접 제공합니다. HTTP 옵션을 지정하면 `spine.NetHTTPHandler(prepared)`로 얻은 handler를 외부 HTTP 서버나 `httptest`에 연결할 수 있습니다. 준비 과정에서는 리스너를 열거나 consumer와 custom transport를 시작하지 않습니다. 설정에 따라 broker readiness와 custom Init은 실행될 수 있습니다.
+The `spine.App` returned by `platform.New()` exposes `app.Prepare(ctx, options)`. With HTTP options configured, attach the handler returned by `spine.NetHTTPHandler(prepared)` to an external HTTP server or `httptest`. Preparation does not open listeners or start consumers and custom transports. Depending on configuration, broker readiness checks and custom Init may run.
 
-준비 결과는 호출자가 `Close(ctx)`로 정리합니다. Close를 시작하면 새 요청은 503을 받고, 진행 중인 요청이 끝난 뒤 프레임워크 자원을 정리합니다. 대기 시간이 초과돼도 정리는 계속되므로 다시 Close를 호출해 완료를 기다릴 수 있습니다. 외부 서버의 listener는 호출자가 종료합니다.
+Callers release prepared resources with `Close(ctx)`. Once Close starts, new requests receive 503. Framework resources are cleaned up after in-flight requests finish. Cleanup continues after a wait timeout; call Close again to wait for completion. The caller shuts down an external server's listener.
 
-API와 자원 소유권은 [Spine v0.6.0 전환 안내](https://github.com/NARUBROWN/spine/blob/v0.6.0/docs/migration/http-adapter-modules.md#리스너-없이-앱-준비하기)를 참고하세요.
+See the [Spine v0.6.0 migration guide](https://github.com/NARUBROWN/spine/blob/v0.6.0/docs/migration/http-adapter-modules.md#%EB%A6%AC%EC%8A%A4%EB%84%88-%EC%97%86%EC%9D%B4-%EC%95%B1-%EC%A4%80%EB%B9%84%ED%95%98%EA%B8%B0) for API and resource ownership.
 
-## 개발 저장소 구성
+## Development repository layout
 
 ```text
 VscodeProjects/
@@ -139,19 +140,19 @@ VscodeProjects/
   spine-echo-platform/
 ```
 
-현재 작업 소스의 go.mod는 Spine `v0.7.0-preview.4`을 사용하며 로컬 replace를 포함하지 않습니다. 소스 CI는 고정한 코어 커밋을 사용합니다. 공개 태그의 검증 상태는 release manifest를 확인하세요. 발행 전후 검증은 [릴리스 운영](RELEASING.md)을 따릅니다. 커널과 함께 개발하려면 위 배치에서 go work init . ../spine으로 로컬 workspace를 만들거나, 기존 go.work의 replace에 기능 worktree 경로를 지정합니다. 로컬 go.work는 커밋하지 않습니다.
+The current source `go.mod` uses Spine `v0.7.0-preview.4` without local replacements. Source CI uses a pinned core commit. Check the release manifest for a public tag's verification status. Follow [release operations](RELEASING.md) for checks before and after publication. To develop alongside the kernel in the layout above, create a local workspace with `go work init . ../spine`, or point a replacement in an existing go.work to a feature worktree. Do not commit the local go.work.
 
-v0.1.0은 Spine `v0.6.0`을 사용합니다. go.work와 로컬 replace 없이 고정한 공개 버전으로 설치하고 빌드합니다.
+v0.1.0 uses Spine `v0.6.0`. Install and build pinned public versions without go.work or local replacements.
 
-[관련 이슈](https://github.com/NARUBROWN/spine/issues/9)와 [최소 E2E 예제](https://github.com/NARUBROWN/spine/tree/v0.6.0/cmd/demo)를 참고하세요.
+See the [related issue](https://github.com/NARUBROWN/spine/issues/9) and [minimal E2E example](https://github.com/NARUBROWN/spine/tree/v0.6.0/cmd/demo).
 
 ```sh
 GOWORK=off go mod verify
 GOWORK=off go test -race ./... -count=1
 ```
 
-공개 CI는 go.work와 로컬 replace 없이 고정한 공개 Spine 버전으로 검사합니다.
+Public CI checks a pinned public Spine version without go.work or local replacements.
 
-## 릴리스와 공개 계약
+## Releases and public contracts
 
-이 플랫폼은 자체 버전과 채널로 발행합니다. `go.mod`의 Spine 버전은 사용하는 공개 계약의 최소 의존성이며 코어 릴리스 채널과 별도로 관리합니다. CI와 공개 설치 검증은 이 모듈의 의존성으로 플랫폼 자체를 검사합니다. 새로운 코어와 기존 플랫폼 태그의 조합 검증은 코어 릴리스에서 수행합니다.
+This platform publishes its own versions and release channels. The Spine version in `go.mod` is the minimum dependency for its public contracts and is managed separately from the core release channel. CI and public installation checks verify the platform against this module's dependencies. Core releases verify combinations of a new core and existing platform tags.
